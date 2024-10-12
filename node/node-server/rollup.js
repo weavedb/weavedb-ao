@@ -1,9 +1,10 @@
 const { DB: ZKDB } = require("zkjson")
-const { CWAO } = require("cwao")
+const { AO } = require("./ao")
 const pako = require("pako")
 const fs = require("fs")
 const { cpSync, rmSync } = require("fs")
 const {
+  o,
   sortBy,
   mergeLeft,
   prop,
@@ -15,6 +16,7 @@ const {
   map,
   includes,
   path: _path,
+  flatten,
 } = require("ramda")
 const DB = require("weavedb-offchain")
 const { open } = require("lmdb")
@@ -171,10 +173,7 @@ class Rollup {
             ["commit", "==", false],
           )
           if (bundling.length > 0) {
-            const b = (await this.measureSizes(bundling, this.last_hash)).slice(
-              0,
-              10,
-            )
+            const b = await this.measureSizes(bundling, this.last_hash)
             this.cb[++this.count] = (
               _err,
               { err, results, success, state },
@@ -211,25 +210,21 @@ class Rollup {
                     ar: this.bundler,
                   },
                 )
-                const tx = await this.syncer.execute({
-                  process: this.contractTxId,
-                  action: "bundle",
-                  input: signed,
+                const input = o(flatten, map(_path(["data", "diff"])))(bundling)
+                const result = await this.syncer.msg({
+                  pid: this.contractTxId,
+                  act: "Rollup",
+                  tags: input,
                 })
-                console.log("lets get result....")
-
-                const result =
-                  (await this.syncer.cu.result(tx.id, this.contractTxId))
-                    ?.Output ?? null
                 if (!isNil(result)) {
                   results.push({
                     hash,
                     height,
-                    tx: result,
+                    tx: { originalTxId: result.mid },
                     items: v,
-                    duration: result.duration,
+                    //duration: result.duration,
                   })
-                  validity[result.originalTxId] = true
+                  validity[result.mid] = true
                 } else {
                   // [TODO] need to handle this
                   console.log("something went wrong with bundling")
@@ -244,12 +239,6 @@ class Rollup {
                 err: null,
                 len: b.length,
                 results,
-              })
-            } else {
-              this.syncer.send({
-                id: this.count,
-                op: "bundle",
-                opt: { height: this.height, b },
               })
             }
           } else {
@@ -361,14 +350,6 @@ class Rollup {
     if (this.type === "ao") {
       // TODO: need implementation
       console.log("ao is not recoverable at the moment")
-    } else {
-      this.syncer.send({
-        id: this.count,
-        op: "recover",
-        opt: {
-          full: !this.partial_recovery,
-        },
-      })
     }
   }
 
@@ -380,7 +361,7 @@ class Rollup {
     await this.initWarp()
     await this.initPlugins()
   }
-
+  /*
   async recoverWAL() {
     this.recovering = true
     this.cb[++this.count] = async (err, { txs }) => {
@@ -544,7 +525,7 @@ class Rollup {
       op: "txs",
       opt: {},
     })
-  }
+  }*/
 
   async initSyncer() {
     if (this.type === "ao") {
@@ -552,51 +533,10 @@ class Rollup {
         console.log("srcTxId is missing...", this.contractTxId)
         return
       }
-      this.syncer = new CWAO({
-        wallet: this.bundler,
-        ...this.ao,
-      })
-      try {
-        console.log(await this.syncer.cu.get())
-        this.init_warp = true
-      } catch (e) {
-        console.log("CU not responding...", this.contractTxId)
-      }
+
+      this.syncer = new AO()
+      this.init_warp = true
       return
-    } else {
-      if (!isNil(this.syncer)) this.syncer.kill()
-      this.syncer = fork(path.resolve(__dirname, "warp"))
-      this.syncer.on("message", async ({ err, result, id }) => {
-        if (!isNil(id)) {
-          await this.cb[id]?.(err, result)
-          delete this.cb[id]
-        }
-      })
-      this.cb[++this.count] = err => {
-        if (err) {
-          console.log(`warp unsuccessful... ${this.contractTxId}`)
-        } else {
-          console.log(`warp successfully initialized! ${this.contractTxId}`)
-          if (this.tx_count === 0) {
-            this.recoverWAL()
-          }
-          this.init_warp = true
-        }
-      }
-      this.syncer.send({
-        id: this.count,
-        op: "init",
-        opt: {
-          snapshot: this.snapshot,
-          sequencerUrl: this.sequencerUrl,
-          apiKey: this.apiKey,
-          arweave: this.arweave,
-          contractTxId: this.contractTxId,
-          bundler: this.bundler,
-          dir: this.dir,
-          dir_backup: this.dir_backup,
-        },
-      })
     }
   }
 

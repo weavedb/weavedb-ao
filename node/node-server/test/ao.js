@@ -2,9 +2,10 @@ const { expect } = require("chai")
 const DB = require("weavedb-node-client")
 const SDK = require("weavedb-sdk-node")
 const { wait, Test } = require("./lib/utils")
-const { CWAO } = require("cwao")
+//const { CWAO } = require("cwao")
 const { readFileSync } = require("fs")
 const { resolve } = require("path")
+const { CU, AO } = require("../ao")
 
 const getModule = async () => readFileSync(resolve(__dirname, "../contract.js"))
 
@@ -31,6 +32,8 @@ describe("WeaveDB on AO", function () {
   })
 
   it("should start server", async () => {
+    await CU(4001)
+    /*
     const cwao = new CWAO({ wallet: bundler, ...base })
     const sch = await arweave.wallets.jwkToAddress(bundler)
     expect(await cwao.mu.get()).to.eql("ao messenger unit")
@@ -40,7 +43,9 @@ describe("WeaveDB on AO", function () {
     const _binary = await getModule()
     const mod_id = await cwao.deploy(_binary)
     await cwao.setSU({ url: base.su })
-
+    */
+    const mod_id = "mod"
+    const sch = "sch"
     const db = new DB({
       rpc: "localhost:9090",
       contractTxId: "testdb",
@@ -78,6 +83,7 @@ describe("WeaveDB on AO", function () {
       { privateKey: admin.privateKey },
     )
     expect((await db.node({ op: "stats" })).dbs[0].data.rollup).to.eql(true)
+
     await wait(2000)
 
     // update the DB (via node)
@@ -94,14 +100,18 @@ describe("WeaveDB on AO", function () {
 
     // check rollup
     await wait(5000)
+    console.log(contractTxId)
+    const ao = new AO()
     expect(
-      await cwao.query({
-        process: contractTxId,
-        action: "get",
-        input: { function: "get", query: ["ppl", "Bob"] },
-      }),
+      (
+        await ao.msg({
+          pid: contractTxId,
+          act: "Query",
+          tags: { Input: { function: "get", query: ["ppl", "Bob"] } },
+        })
+      ).out,
     ).to.eql(Bob)
-
+    /*    
     // get zk merkle tree hash
     try {
       expect(await cwao.cu.hash(contractTxId)).to.eql({
@@ -114,6 +124,7 @@ describe("WeaveDB on AO", function () {
       ).to.eql(Bob)
     } catch (e) {
       console.log(e)
-    }
+      }
+    */
   })
 })
