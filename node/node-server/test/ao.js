@@ -108,7 +108,6 @@ describe("WeaveDB on AO", function () {
         hash: "9490062173314360716133102172838140491357233774084690229623706293601383041546",
         height: 1,
       })
-      console.log(await cwao.cu.zkjson(contractTxId, "ppl", "Bob", "name"))
       // get zkJSON proof
       expect(
         (await cwao.cu.zkjson(contractTxId, "ppl", "Bob", "name")).data,

@@ -243,7 +243,7 @@ class VM {
       const parsed = this.parseQuery(call, callback)
       const { type, res, nocache, txid, func, query, isAdmin } = parsed
       if (isAdmin) {
-        const { op, module, scheduler, key, db, type } = JSON.parse(query).query
+        let { op, module, scheduler, key, db, type } = JSON.parse(query).query
         const auth = { privateKey: this.conf.admin }
         let err, signer
         switch (op) {

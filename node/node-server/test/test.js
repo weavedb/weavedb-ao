@@ -64,7 +64,7 @@ describe("rollup node", function () {
       arweave: network,
     })
     await warp_db.init()
-    expect((await warp_db.getInfo()).version).to.eql("0.40.0")
+    expect((await warp_db.getInfo()).version).to.eql("0.42.1")
 
     // update the DB (via node)
     const db2 = new DB({
