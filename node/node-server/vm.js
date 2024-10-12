@@ -3,7 +3,8 @@ const SDK = require("weavedb-node-client")
 const { Wallet, isAddress } = require("ethers")
 const { validate } = require("./lib/validate")
 const Snapshot = require("./lib/snapshot")
-const { CWAO } = require("cwao")
+const { AO } = require("./ao")
+
 const {
   all,
   indexBy,
@@ -346,113 +347,36 @@ class VM {
                     polygonID: "polygon-id",
                     jsonschema: "jsonschema",
                   }
-                  const cwao = new CWAO({
-                    wallet: this.conf.bundler,
-                    ...this.conf.ao,
-                  })
-                  const pr = await cwao.instantiate({
-                    module,
-                    scheduler,
-                    input: initialState,
-                  })
+                  const ao = await new AO(this.conf.ao).init(this.conf.bundler)
+                  const { pid } = await ao.deploy({})
                   const tx = await this.admin_db.update(
-                    { contractTxId: pr.id, type: "ao", srcTxId: module },
+                    { contractTxId: pid, type: "ao", srcTxId: module },
                     "dbs",
                     key,
                     auth,
                   )
                   console.log(
-                    `contract deployed: ${pr.id} [${key}:${tx.success}]`,
+                    `contract deployed: ${pid} [${key}:${tx.success}]`,
                   )
                   callback(null, {
                     result: JSON.stringify({
-                      contractTxId: pr.id,
+                      contractTxId: pid,
                       srcTxId: module,
                     }),
                     err,
                   })
-                  this.txid_map[pr.id] = key
+                  this.txid_map[pid] = key
                   this.rollups[key].deployContract(
-                    pr.id,
+                    pid,
                     module,
                     ++this.count,
                     () => {
-                      console.log(`AO contract initialized! ${pr.id}`)
+                      console.log(`AO contract initialized! ${pid}`)
                     },
                     "ao",
                     this.conf.ao,
                   )
                   return
-                } else {
-                  const warp =
-                    this.conf.arweave?.host === "localhost"
-                      ? WarpFactory.forLocal().use(new DeployPlugin())
-                      : WarpFactory.forMainnet().use(new DeployPlugin())
-                  const srcTxId =
-                    this.conf.weavedb_srcTxId ??
-                    "E14TapQNshyUIyN_DNhI0-YdUs8OP4-KXSgZnSxnROM"
-                  let res = null
-                  let err = null
-                  try {
-                    initialState.contracts = this.conf.contracts ?? {
-                      dfinity: "3OnjOPuWzB138LOiNxqq2cKby2yANw6RWcQVEkztXX8",
-                      ethereum: "Awwzwvw7qfc58cKS8cG3NsPdDet957-Bf-S1RcHry0w",
-                      bundler: "lry5KMRj6j13sLHsKxs1D2joLjcj6yNHtNQQQoaHRug",
-                      nostr: "PDuTzRpn99EwiUvT9XrUhg8nyhW20Wcd-XcRXboCpHs",
-                      polygonID: "Lmu_BUdDuzja4X_egjPeOPdrQH6SQ5HgW7tKUpX37Gc",
-                      jsonschema: "Mu5RtB1v_N6vW2cf0zRhOsIrrpcvSaEW8zeFlHMuVNI",
-                    }
-                    res = await warp.createContract.deployFromSourceTx({
-                      wallet:
-                        _arweave.host === "localhost"
-                          ? this.conf.bundler
-                          : new ArweaveSigner(this.conf.bundler),
-                      initState: JSON.stringify(initialState),
-                      srcTxId,
-                      evaluationManifest: {
-                        evaluationOptions: {
-                          useKVStorage: true,
-                          internalWrites: true,
-                          allowBigInt: true,
-                        },
-                      },
-                    })
-                  } catch (e) {
-                    err = e
-                    console.log(e)
-                  }
-                  if (isNil(res?.contractTxId) || !isNil(err)) {
-                    callback(null, {
-                      result: null,
-                      err: err ?? "unknown error",
-                    })
-                    return
-                  } else {
-                    const tx = await this.admin_db.update(
-                      { contractTxId: res.contractTxId, srcTxId, type: "warp" },
-                      "dbs",
-                      key,
-                      auth,
-                    )
-                    console.log(
-                      `contract deployed: ${res.contractTxId} [${key}:${tx.success}]`,
-                    )
-                    callback(null, {
-                      result: JSON.stringify(res),
-                      err,
-                    })
-                    this.txid_map[res.contractTxId] = key
-                    this.rollups[key].deployContract(
-                      res.contractTxId,
-                      srcTxId,
-                      ++this.count,
-                      () => {
-                        console.log(
-                          `Warp contract initialized! ${res.contractTxId}`,
-                        )
-                      },
-                    )
-                  }
                 }
               }
             }
