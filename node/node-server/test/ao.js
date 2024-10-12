@@ -2,20 +2,23 @@ const { expect } = require("chai")
 const DB = require("weavedb-node-client")
 const SDK = require("weavedb-sdk-node")
 const { wait, Test } = require("./lib/utils")
-//const { CWAO } = require("cwao")
 const { readFileSync } = require("fs")
 const { resolve } = require("path")
-const { CU, AO } = require("../ao")
+const { AO } = require("aonote")
+const { setup, ok, fail } = require("./lib/helpers.js")
 
 const getModule = async () => readFileSync(resolve(__dirname, "../contract.js"))
 
 describe("WeaveDB on AO", function () {
   this.timeout(0)
-  let admin, network, bundler, test, base, arweave
+  let admin, network, bundler, test, base, arweave, opt
 
   before(async () => {
+    ;({ opt } = await setup({ cache: true }))
+
     // testing in insecure mode, never do that in production
     test = new Test({
+      aos: opt.ao,
       secure: false,
       sequencerUrl: "https://gw.warp.cc/",
       apiKey: "xyz",
@@ -31,21 +34,7 @@ describe("WeaveDB on AO", function () {
     process.exit()
   })
 
-  it("should start server", async () => {
-    await CU(4001)
-    /*
-    const cwao = new CWAO({ wallet: bundler, ...base })
-    const sch = await arweave.wallets.jwkToAddress(bundler)
-    expect(await cwao.mu.get()).to.eql("ao messenger unit")
-    expect((await cwao.cu.get()).address).to.eql(sch)
-    expect((await cwao.su.get()).Address).to.eql(sch)
-    expect((await cwao.su.timestamp()).block_height).to.eql(0)
-    const _binary = await getModule()
-    const mod_id = await cwao.deploy(_binary)
-    await cwao.setSU({ url: base.su })
-    */
-    const mod_id = "mod"
-    const sch = "sch"
+  it("should deploy weavedb on AO", async () => {
     const db = new DB({
       rpc: "localhost:9090",
       contractTxId: "testdb",
@@ -77,8 +66,8 @@ describe("WeaveDB on AO", function () {
         op: "deploy_contract",
         key: "testdb",
         type: "ao",
-        module: mod_id,
-        scheduler: sch,
+        module: opt.ao.module,
+        scheduler: opt.ao.scheduler,
       },
       { privateKey: admin.privateKey },
     )
@@ -100,16 +89,18 @@ describe("WeaveDB on AO", function () {
 
     // check rollup
     await wait(5000)
-    console.log(contractTxId)
-    const ao = new AO()
+    const ao = new AO(opt.ao)
     expect(
-      (
-        await ao.msg({
-          pid: contractTxId,
-          act: "Query",
-          tags: { Input: { function: "get", query: ["ppl", "Bob"] } },
-        })
-      ).out,
+      JSON.parse(
+        (
+          await ao.dry({
+            pid: contractTxId,
+            act: "Get",
+            tags: { Query: JSON.stringify(["ppl", "Bob"]) },
+            get: { name: "Result", json: true },
+          })
+        ).out,
+      ),
     ).to.eql(Bob)
     /*    
     // get zk merkle tree hash

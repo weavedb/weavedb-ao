@@ -1,6 +1,5 @@
 const { DB: ZKDB } = require("zkjson")
-const { AO } = require("./ao")
-const pako = require("pako")
+const { AO } = require("aonote")
 const fs = require("fs")
 const { cpSync, rmSync } = require("fs")
 const {
@@ -59,7 +58,7 @@ const getNewHash = async (last_hash, current_hash) => {
 class Rollup {
   constructor({
     sequencerUrl,
-    ao,
+    aos,
     apiKey,
     txid,
     srcTxId,
@@ -82,7 +81,7 @@ class Rollup {
     this.snapshot = snapshot
     this.cb = {}
     this.type = type
-    this.ao = ao
+    this.aos = aos
     this.sequencerUrl = sequencerUrl
     this.apiKey = apiKey
     this.arweave = arweave
@@ -211,22 +210,24 @@ class Rollup {
                   },
                 )
                 const input = o(flatten, map(_path(["data", "diff"])))(bundling)
-                const result = await this.syncer.msg({
+                const { err, mid } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
-                  tags: input,
+                  data: JSON.stringify(input),
+                  checkData: "committed!",
                 })
-                if (!isNil(result)) {
+                if (!err) {
                   results.push({
                     hash,
                     height,
-                    tx: { originalTxId: result.mid },
+                    tx: { originalTxId: mid },
                     items: v,
                     //duration: result.duration,
                   })
-                  validity[result.mid] = true
+                  validity[mid] = true
                 } else {
                   // [TODO] need to handle this
+                  console.log(err)
                   console.log("something went wrong with bundling")
                 }
               }
@@ -534,7 +535,7 @@ class Rollup {
         return
       }
 
-      this.syncer = new AO()
+      this.syncer = await new AO(this.aos).init(this.bundler)
       this.init_warp = true
       return
     }

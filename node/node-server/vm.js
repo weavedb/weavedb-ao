@@ -3,7 +3,9 @@ const SDK = require("weavedb-node-client")
 const { Wallet, isAddress } = require("ethers")
 const { validate } = require("./lib/validate")
 const Snapshot = require("./lib/snapshot")
-const { AO } = require("./ao")
+const { readFileSync } = require("fs")
+const { resolve } = require("path")
+const { AO } = require("aonote")
 
 const {
   all,
@@ -20,11 +22,6 @@ const {
 const { privateToAddress } = require("ethereumjs-util")
 const path = require("path")
 const { fork } = require("child_process")
-const {
-  DeployPlugin,
-  ArweaveSigner,
-} = require("weavedb-warp-contracts-plugin-deploy")
-const { WarpFactory } = require("warp-contracts")
 
 class Rollup {
   constructor({
@@ -47,6 +44,7 @@ class Rollup {
     apiKey,
     snapshot,
     ao,
+    aos,
   }) {
     this.cb = {}
     this.txid = txid
@@ -63,7 +61,7 @@ class Rollup {
       this.db.send({
         op: "new",
         params: {
-          ao,
+          aos,
           type,
           snapshot,
           srcTxId,
@@ -144,7 +142,7 @@ class VM {
   }
   getRollup(v, txid) {
     return new Rollup({
-      ao: this.conf.ao,
+      aos: this.conf.aos,
       type: v.type,
       snapshot: this.conf.snapshot,
       sequencerUrl: this.conf.sequencerUrl,
@@ -347,8 +345,16 @@ class VM {
                     polygonID: "polygon-id",
                     jsonschema: "jsonschema",
                   }
-                  const ao = await new AO(this.conf.ao).init(this.conf.bundler)
-                  const { pid } = await ao.deploy({})
+
+                  const ao = await new AO(this.conf.aos).init(this.conf.bundler)
+                  const data = readFileSync(
+                    resolve(__dirname, "./lua/weavedb.lua"),
+                    "utf8",
+                  )
+
+                  const { pid } = await ao.spwn({})
+                  await ao.wait({ pid })
+                  const { mid } = await ao.load({ pid, data })
                   const tx = await this.admin_db.update(
                     { contractTxId: pid, type: "ao", srcTxId: module },
                     "dbs",
@@ -433,7 +439,7 @@ class VM {
             }
             if (tx.success) {
               this.rollups[key] = new Rollup({
-                ao: this.conf.ao,
+                aos: this.conf.aos,
                 type: db.type,
                 snapshot: this.conf.snapshot,
                 sequencerUrl: this.conf.sequencerUrl,
