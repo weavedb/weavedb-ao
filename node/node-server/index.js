@@ -7,7 +7,11 @@ const {
   config = "./weavedb.config.js",
 } = require("yargs")(process.argv.slice(2)).argv
 
-const vm = new VM({ dbname, conf: require(config) })
+let conf = { rollup: {} }
+try {
+  conf = require(config)
+} catch (e) {}
+const vm = new VM({ dbname, conf })
 new Server({ query: vm.query.bind(vm) })
 
 if (vm.conf.nostr) {
