@@ -670,7 +670,7 @@ class Rollup {
               diff.push({
                 collection: sps[0],
                 doc: k.split("///")[1]?.split("/")[1],
-                data: tx.result.kvs[k].val,
+                data: tx.result.kvs[k]?.val ?? null,
               })
             }
             this.kvs[k] = tx.result.kvs[k]
