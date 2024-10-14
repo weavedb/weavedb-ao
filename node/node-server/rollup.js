@@ -632,7 +632,13 @@ class Rollup {
         owner: this.owner,
         secure: this.secure ?? true,
         auth: {
-          algorithms: ["secp256k1", "secp256k1-2", "ed25519", "rsa256"],
+          algorithms: [
+            "secp256k1",
+            "secp256k1-2",
+            "ed25519",
+            "rsa256",
+            "rsa-pss",
+          ],
           name: "weavedb",
           version: "1",
           //skip_validation: true,
