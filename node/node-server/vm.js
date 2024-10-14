@@ -295,7 +295,7 @@ class VM {
               } else {
                 type ??= "warp"
                 let initialState = {
-                  version: this.conf.weavedb_version ?? "0.44.2",
+                  version: this.conf.weavedb_version ?? "0.45.0",
                   canEvolve: true,
                   evolve: null,
                   secure: _db.secure ?? this.conf.secure,
@@ -305,6 +305,7 @@ class VM {
                       "secp256k1-2",
                       "ed25519",
                       "rsa256",
+                      "rsa-pss",
                     ],
                     name: "weavedb",
                     version: "1",
