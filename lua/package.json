@@ -6,7 +6,7 @@
     "test": "mocha"
   },
   "dependencies": {
-    "aonote": "^0.8.2",
+    "aonote": "^0.8.3",
     "chai": "^5.1.1",
     "mocha": "^10.7.3"
   }

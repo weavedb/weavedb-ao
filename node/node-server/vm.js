@@ -333,10 +333,11 @@ class VM {
                   protocol: "https",
                 }
                 const arweave = Arweave.init(_arweave)
+                const bundler = await arweave.wallets.jwkToAddress(
+                  this.conf.bundler,
+                )
                 initialState.owner = _db.owner
-                initialState.bundlers = [
-                  await arweave.wallets.jwkToAddress(this.conf.bundler),
-                ]
+                initialState.bundlers = [bundler]
                 if (type === "ao") {
                   initialState.contracts = {
                     ethereum: "ethereum",
@@ -355,7 +356,11 @@ class VM {
 
                   const { pid } = await ao.spwn({})
                   await ao.wait({ pid })
-                  const { mid } = await ao.load({ pid, data })
+                  const { mid } = await ao.load({
+                    pid,
+                    data,
+                    fills: { BUNDLER: bundler },
+                  })
                   const tx = await this.admin_db.update(
                     { contractTxId: pid, type: "ao", srcTxId: module },
                     "dbs",

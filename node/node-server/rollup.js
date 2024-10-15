@@ -209,11 +209,18 @@ class Rollup {
                     ar: this.bundler,
                   },
                 )
-                const input = o(flatten, map(_path(["data", "diff"])))(bundling)
+                const diffs = o(flatten, map(_path(["data", "diff"])))(bundling)
+                const txs = map(v => {
+                  return {
+                    id: v.data.txid,
+                    ts: v.data.tx_ts,
+                    input: v.data.input,
+                  }
+                })(bundling)
                 const { err, mid } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
-                  data: JSON.stringify(input),
+                  data: JSON.stringify({ diffs, txs }),
                   checkData: "committed!",
                 })
                 if (!err) {

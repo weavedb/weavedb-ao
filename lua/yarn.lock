@@ -626,10 +626,10 @@ anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aonote@^0.8.2:
-  version "0.8.2"
-  resolved "https://registry.npmjs.org/aonote/-/aonote-0.8.2.tgz"
-  integrity sha512-CZNXHm4ApPCIHWbAkMHulobxN3aaRxoB36mAQfc5ekOSQ5qI1tUIAVSzAUmmYd/eQZxnZY9rtexhI6KFKy7arA==
+aonote@^0.8.3:
+  version "0.8.3"
+  resolved "https://registry.npmjs.org/aonote/-/aonote-0.8.3.tgz"
+  integrity sha512-v+jgz8pKn+brD3RrpqMFnxrj8hBRBBSlzrQgoKrjFrm0OF9wZaWaWwvWAS9CxrjL/0m3DXIc3f7Ytq1jJMhXcQ==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
     "@permaweb/aoconnect" "^0.0.59"
