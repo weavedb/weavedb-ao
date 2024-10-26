@@ -103,6 +103,22 @@ class Rollup {
       console.log(e)
     }
   }
+  hash(id, res) {
+    this.cb[id] = res
+    try {
+      this.db.send({ op: "hash", id })
+    } catch (e) {
+      console.log(e)
+    }
+  }
+  zkp(collection, doc, path, id, res) {
+    this.cb[id] = res
+    try {
+      this.db.send({ op: "zkp", id, collection, doc, path })
+    } catch (e) {
+      console.log(e)
+    }
+  }
   deployContract(contractTxId, srcTxId, id, res, type = "warp", ao) {
     this.cb[id] = res
     try {
@@ -242,7 +258,8 @@ class VM {
       const parsed = this.parseQuery(call, callback)
       const { type, res, nocache, txid, func, query, isAdmin } = parsed
       if (isAdmin) {
-        let { op, module, scheduler, key, db, type } = JSON.parse(query).query
+        let { op, module, scheduler, key, db, type, collection, doc, path } =
+          JSON.parse(query).query
         const auth = { privateKey: this.conf.admin }
         let err, signer
         switch (op) {
@@ -263,6 +280,28 @@ class VM {
               })
             }
 
+            break
+          case "zkp":
+            this.rollups[key].zkp(
+              collection,
+              doc,
+              path,
+              ++this.count,
+              (err, res) => {
+                callback(null, {
+                  result: JSON.stringify({ zkp: res.zkp }),
+                  err: null,
+                })
+              },
+            )
+            break
+          case "hash":
+            this.rollups[key].hash(++this.count, (err, res) => {
+              callback(null, {
+                result: JSON.stringify({ hash: res.hash }),
+                err: null,
+              })
+            })
             break
           case "deploy_contract":
             ;({ err, signer } = await validate(JSON.parse(query), txid))

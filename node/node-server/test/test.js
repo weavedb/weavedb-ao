@@ -2,19 +2,29 @@ const { expect } = require("chai")
 const DB = require("weavedb-node-client")
 const SDK = require("weavedb-sdk-node")
 const { wait, Test } = require("./lib/utils")
+const { readFileSync } = require("fs")
+const { resolve } = require("path")
+const { AO } = require("aonote")
+const { setup, ok, fail } = require("./lib/helpers.js")
 
-describe("rollup node", function () {
+const getModule = async () => readFileSync(resolve(__dirname, "../contract.js"))
+
+describe("WeaveDB on AO", function () {
   this.timeout(0)
-  let admin, network, bundler, test
+  let admin, network, bundler, test, base, arweave, opt
 
   before(async () => {
+    ;({ opt } = await setup({ cache: true }))
+
     // testing in insecure mode, never do that in production
     test = new Test({
+      aos: opt.ao,
       secure: false,
       sequencerUrl: "https://gw.warp.cc/",
       apiKey: "xyz",
+      ao: true,
     })
-    ;({ network, bundler, admin } = await test.start())
+    ;({ network, arweave, bundler, admin, base } = await test.start())
     await wait(3000)
   })
 
@@ -24,7 +34,7 @@ describe("rollup node", function () {
     process.exit()
   })
 
-  it("should start server", async () => {
+  it("should deploy weavedb on AO", async () => {
     const db = new DB({
       rpc: "localhost:9090",
       contractTxId: "testdb",
@@ -49,22 +59,21 @@ describe("rollup node", function () {
       { privateKey: admin.privateKey },
     )
     expect(tx.success).to.eql(true)
-    // deploy L1 warp contract (via node)
+
+    // deploy L1 AO contract (via node)
     const { contractTxId, srcTxId } = await db.admin(
-      { op: "deploy_contract", key: "testdb" },
+      {
+        op: "deploy_contract",
+        key: "testdb",
+        type: "ao",
+        module: opt.ao.module,
+        scheduler: opt.ao.scheduler,
+      },
       { privateKey: admin.privateKey },
     )
     expect((await db.node({ op: "stats" })).dbs[0].data.rollup).to.eql(true)
-    await wait(2000)
 
-    // check L1 warp contract info directly with SDK (not via node)
-    const warp_db = new SDK({
-      type: 3,
-      contractTxId,
-      arweave: network,
-    })
-    await warp_db.init()
-    expect((await warp_db.getInfo()).version).to.eql("0.42.1")
+    await wait(2000)
 
     // update the DB (via node)
     const db2 = new DB({
@@ -80,10 +89,41 @@ describe("rollup node", function () {
 
     // check rollup
     await wait(5000)
+    const ao = new AO(opt.ao)
+    expect(
+      JSON.parse(
+        (
+          await ao.dry({
+            pid: contractTxId,
+            act: "Get",
+            tags: { Query: JSON.stringify(["ppl", "Bob"]) },
+            get: { name: "Result", json: true },
+          })
+        ).out,
+      ),
+    ).to.eql(Bob)
 
-    const res = await warp_db.db.readState()
-    expect(res.cachedValue.state.rollup.height).to.eql(1)
-    // check if L1 Warp state is the same as L2 DB state
-    expect(await warp_db.get("ppl", "Bob")).to.eql(Bob)
+    // check zkp
+    let hash = null
+    let zkp = null
+    try {
+      hash = (await db.node({ op: "hash", key: "testdb" })).hash
+    } catch (e) {
+      console.log(e)
+    }
+    try {
+      zkp = (
+        await db.node({
+          op: "zkp",
+          key: "testdb",
+          collection: "ppl",
+          doc: "Bob",
+          path: "name",
+        })
+      ).zkp
+    } catch (e) {
+      console.log(e)
+    }
+    expect(hash).to.eql(zkp[21])
   })
 })
