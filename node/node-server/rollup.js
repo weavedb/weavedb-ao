@@ -78,6 +78,7 @@ class Rollup {
     snapshot,
     type = "warp",
   }) {
+    this.hash = null
     this.snapshot = snapshot
     this.cb = {}
     this.type = type
@@ -126,7 +127,33 @@ class Rollup {
     await this.initDB()
     if (this.rollup) this.bundle()
   }
-
+  async genZKP(col, doc, path) {
+    let col_id = this.cols[col]
+    let zkp = null
+    if (isNil(col_id)) return { err: "collection doesn't exist", zkp }
+    let json = null
+    try {
+      json = await this.db.get(col, doc)
+    } catch (e) {
+      console.log(e)
+    }
+    if (!json) return { err: "doc doesn't exist", zkp }
+    if (isNil(json[path])) return { err: "path doesn't exist", zkp }
+    try {
+      const start = Date.now()
+      zkp = await this.zkdb.genProof({
+        json,
+        col_id,
+        path,
+        id: doc,
+      })
+      console.log("zkp generated...", Date.now() - start)
+    } catch (e) {
+      console.log(e)
+      return { err: e }
+    }
+    return { err: null, zkp }
+  }
   async measureSizes(bundles, last_hash) {
     let sizes = 0
     let b = [{ bundles: [], t: [], size: 0 }]
@@ -186,10 +213,7 @@ class Rollup {
               })
             }
             if (this.type === "ao") {
-              const warp = new DB({
-                type: 3,
-                contractTxId: this.contractTxId,
-              })
+              const warp = new DB({ type: 3, contractTxId: this.contractTxId })
               let height = this.height
               let results = []
               let validity = {}
@@ -232,6 +256,40 @@ class Rollup {
                     //duration: result.duration,
                   })
                   validity[mid] = true
+                  if (diffs.length > 0) {
+                    for (const v of diffs) {
+                      let col_id = this.cols[v.collection]
+                      if (!col_id) {
+                        col_id = await this.zkdb.addCollection()
+                        this.cols[v.collection] = col_id
+                      }
+                      const res = await this.zkdb.insert(col_id, v.doc, v.data)
+                    }
+                    let txs = diffs.map(v => {
+                      const col_id = this.cols[v.collection]
+                      return [col_id, v.doc, v.data]
+                    })
+                    console.log(txs)
+                    /*
+                    const start = Date.now()
+                    const zkp = await this.zkdb.genRollupProof(txs)
+                    console.log("zkp generated...", Date.now() - start)
+                    */
+                    this.hash = this.zkdb.tree.F.toObject(
+                      this.zkdb.tree.root,
+                    ).toString()
+                    console.log("zkp hash:", this.hash)
+                    /*
+                      const start2 = Date.now()
+                    const zkp2 = await this.zkdb.genProof({
+                      json: diffs[0].data,
+                      col_id: 0,
+                      path: "name",
+                      id: "Bob",
+                    })
+                    console.log("zkp generated2...", Date.now() - start2)
+                    */
+                  }
                 } else {
                   // [TODO] need to handle this
                   console.log(err)
@@ -619,19 +677,13 @@ class Rollup {
   }
   async initZKDB() {
     this.zkdb = new ZKDB({
-      level: 100,
-      size_path: 5,
-      size_val: 5,
-      size_json: 256,
-      size_txs: 10,
-      level_col: 8,
       wasmRU: path.resolve(__dirname, "circom/rollup/index_js/index.wasm"),
       zkeyRU: path.resolve(__dirname, "circom/rollup/index_0001.zkey"),
       wasm: path.resolve(__dirname, "circom/db/index_js/index.wasm"),
       zkey: path.resolve(__dirname, "circom/db/index_0001.zkey"),
     })
     await this.zkdb.init()
-    const col_id = await this.zkdb.addCollection()
+    this.cols = {}
   }
   async initOffchain() {
     let state = {
@@ -702,7 +754,7 @@ class Rollup {
             /*
               if (diff.length > 0) {
               if (this.txid === "testdb") {
-                for (const v of diff) {
+              for (const v of diff) {
                 const res = await this.zkdb.insert(0, v.doc, v.data)
                 }
 
@@ -880,6 +932,16 @@ process.on("message", async msg => {
     await rollup.initWarp()
     rollup.bundle()
     process.send({ op, id })
+  } else if (op === "hash") {
+    process.send({ op, id, result: { hash: rollup.hash } })
+  } else if (op === "zkp") {
+    const { err, zkp } = await rollup.genZKP(msg.collection, msg.doc, msg.path)
+    process.send({
+      op,
+      id,
+      err,
+      result: { zkp },
+    })
   } else {
     process.send({ op, id })
   }
