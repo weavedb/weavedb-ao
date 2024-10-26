@@ -16,7 +16,7 @@
     "@grpc/grpc-js": "~1.1.8",
     "@grpc/proto-loader": "~0.5.0",
     "@metamask/eth-sig-util": "^5.0.2",
-    "aonote": "^0.8.2",
+    "aonote": "^0.8.3",
     "archiver": "^5.3.1",
     "arweave": "^1.14.4",
     "aws-sdk": "^2.1306.0",

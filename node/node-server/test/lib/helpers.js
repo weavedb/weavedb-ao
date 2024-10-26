@@ -39,7 +39,7 @@ const setup = async ({
   }
   if (opt) {
     const ar = await new AR(opt.ar).init(opt.jwk)
-    const ao = new AO({ ...opt.ar, ar })
+    const ao = new AO({ ...opt.ao, ar })
     const profile = new Profile({ ...opt.profile, ao })
     return { opt, ar, ao, profile }
   }
