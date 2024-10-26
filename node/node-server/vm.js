@@ -289,7 +289,7 @@ class VM {
               ++this.count,
               (err, res) => {
                 callback(null, {
-                  result: JSON.stringify({ zkp: res.zkp }),
+                  result: JSON.stringify({ zkp: res.zkp, col_id: res.col_id }),
                   err: null,
                 })
               },

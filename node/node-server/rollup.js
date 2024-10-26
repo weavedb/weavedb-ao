@@ -152,7 +152,7 @@ class Rollup {
       console.log(e)
       return { err: e }
     }
-    return { err: null, zkp }
+    return { err: null, zkp, col_id }
   }
   async measureSizes(bundles, last_hash) {
     let sizes = 0
@@ -935,12 +935,16 @@ process.on("message", async msg => {
   } else if (op === "hash") {
     process.send({ op, id, result: { hash: rollup.hash } })
   } else if (op === "zkp") {
-    const { err, zkp } = await rollup.genZKP(msg.collection, msg.doc, msg.path)
+    const { err, zkp, col_id } = await rollup.genZKP(
+      msg.collection,
+      msg.doc,
+      msg.path,
+    )
     process.send({
       op,
       id,
       err,
-      result: { zkp },
+      result: { zkp, col_id },
     })
   } else {
     process.send({ op, id })
