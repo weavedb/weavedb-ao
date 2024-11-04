@@ -13,8 +13,3 @@ try {
 } catch (e) {}
 const vm = new VM({ dbname, conf })
 new Server({ query: vm.query.bind(vm) })
-
-if (vm.conf.nostr) {
-  const { nostr } = require("./nostr")
-  nostr({ server: vm, port: vm.conf.nostr.port, db: vm.conf.nostr.db })
-}

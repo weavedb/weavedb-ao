@@ -59,7 +59,7 @@ export default function Home() {
           const _txs = await db.cget(
             "txs",
             ["id", "desc"],
-            ["block", "==", +router.query.block]
+            ["block", "==", +router.query.block],
           )
           setTxs(_txs)
           let i = 0
@@ -140,19 +140,19 @@ export default function Home() {
                 </Flex>
                 <Flex pt={2} mt={2} sx={{ borderTop: "1px solid #ddd" }}>
                   <Box flex={1}>
-                    <Box sx={{ color: "#999" }}>Contract TxID</Box>
+                    <Box sx={{ color: "#999" }}>AO Process ID</Box>
                     <Box sx={{ fontSize: "14px" }}>
                       {!isNil(db_info?.contractTxId) ? (
                         <Box
                           as="a"
                           color="#763AAC"
-                          href={`https://sonar.warp.cc/#/app/contract/${db_info.contractTxId}?network=mainnet`}
+                          href={`https://ao.link/#/message/${db_info.contractTxId}`}
                           target="_blank"
                         >
                           {db_info.contractTxId}
                         </Box>
                       ) : (
-                        router.query?.db ?? "-"
+                        (router.query?.db ?? "-")
                       )}
                     </Box>
                   </Box>
@@ -171,13 +171,13 @@ export default function Home() {
                     sx={{ borderRight: "1px solid #ddd" }}
                   ></Box>
                   <Box flex={1}>
-                    <Box sx={{ color: "#999" }}>Warp TxId</Box>
+                    <Box sx={{ color: "#999" }}>Message ID</Box>
                     <Box sx={{ fontSize: "14px" }}>
                       {!isNil(block?.data?.txid) ? (
                         <Box
                           as="a"
                           color="#763AAC"
-                          href={`https://sonar.warp.cc/#/app/interaction/${block.data.txid}?network=mainnet`}
+                          href={`https://ao.link/#/message/${block.data.txid}`}
                           target="_blank"
                         >
                           {block.data.txid}
@@ -228,7 +228,7 @@ export default function Home() {
                           Date
                         </Box>
                         <Box as="td" p={2} w="100px">
-                          Warp TxId
+                          AO Message ID
                         </Box>
                       </Box>
                       <Box as="tbody">
@@ -309,7 +309,7 @@ export default function Home() {
                                 </Box>
                                 <Box as="td" p={2} w="100px">
                                   {dayjs(v.tx_ts ?? v.blk_ts ?? 0).fromNow(
-                                    true
+                                    true,
                                   )}
                                 </Box>
                                 <Box as="td" p={2}>
@@ -317,7 +317,7 @@ export default function Home() {
                                     <Box
                                       as="a"
                                       target="_blank"
-                                      href={`https://sonar.warp.cc/#/app/interaction/${v.warp}?network=mainnet`}
+                                      href={`https://ao.link/#/message/${v.warp}`}
                                       color="#763AAC"
                                       onClick={e => e.stopPropagation()}
                                     >

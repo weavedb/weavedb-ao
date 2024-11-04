@@ -197,6 +197,7 @@ class VM {
           ],
         ],
       ]
+      // we dont' need to set rules every time we start it out
       const tx = await this.admin_db.setRules(rules, "dbs", auth)
       console.log(`__admin__ rules added: ${tx.success}`)
       const rollups = this.conf.rollups || { offchain: {} }
@@ -217,6 +218,7 @@ class VM {
             dbname,
             k,
           )
+          // is this working??
           await this.checkSnapShot({ dbname, dir, contractTxId })
         }
         this.rollups[k] = this.getRollup(ru, k)

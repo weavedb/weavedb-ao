@@ -135,19 +135,19 @@ export default function Home() {
                 </Flex>
                 <Flex pt={2} mt={2} sx={{ borderTop: "1px solid #ddd" }}>
                   <Box flex={1}>
-                    <Box sx={{ color: "#999" }}>Contract TxID</Box>
+                    <Box sx={{ color: "#999" }}>AO Process ID</Box>
                     <Box sx={{ fontSize: "14px" }}>
                       {!isNil(db_info?.contractTxId) ? (
                         <Box
                           as="a"
                           color="#763AAC"
-                          href={`https://sonar.warp.cc/#/app/contract/${db_info.contractTxId}?network=mainnet`}
+                          href={`https://ao.link/#/entity/${db_info.contractTxId}`}
                           target="_blank"
                         >
                           {db_info.contractTxId}
                         </Box>
                       ) : (
-                        router.query?.db ?? "-"
+                        (router.query?.db ?? "-")
                       )}
                     </Box>
                   </Box>
@@ -225,7 +225,7 @@ export default function Home() {
                             Txn
                           </Box>
                           <Box as="td" p={2} w="70px">
-                            Warp TxId
+                            AO Process ID
                           </Box>
                           <Box as="td" p={2} w="70px">
                             Date
@@ -260,7 +260,7 @@ export default function Home() {
                                     <Box
                                       as="a"
                                       target="_blank"
-                                      href={`https://sonar.warp.cc/#/app/interaction/${v.txid}?network=mainnet`}
+                                      href={`https://ao.link/#/message/${v.txid}`}
                                       color="#763AAC"
                                       onClick={e => e.stopPropagation()}
                                     >
@@ -285,7 +285,7 @@ export default function Home() {
                           py={2}
                           onClick={() => {
                             router.push(
-                              `/node/${router.query.id}/db/${router.query.db}/blocks`
+                              `/node/${router.query.id}/db/${router.query.db}/blocks`,
                             )
                           }}
                           sx={{
@@ -440,7 +440,7 @@ export default function Home() {
 
                                   <Box as="td" p={2} w="120px">
                                     {dayjs(v.tx_ts ?? v.blk_ts ?? 0).fromNow(
-                                      true
+                                      true,
                                     )}
                                   </Box>
                                 </Box>
@@ -458,7 +458,7 @@ export default function Home() {
                           py={2}
                           onClick={() => {
                             router.push(
-                              `/node/${router.query.id}/db/${router.query.db}/txs`
+                              `/node/${router.query.id}/db/${router.query.db}/txs`,
                             )
                           }}
                           sx={{
