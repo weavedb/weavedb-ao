@@ -127,6 +127,7 @@ class Rollup {
     await this.initDB()
     if (this.rollup) this.bundle()
   }
+
   async genZKP(col, doc, path) {
     let col_id = this.cols[col]
     let zkp = null
@@ -154,6 +155,7 @@ class Rollup {
     }
     return { err: null, zkp, col_id }
   }
+
   async measureSizes(bundles, last_hash) {
     let sizes = 0
     let b = [{ bundles: [], t: [], size: 0 }]
@@ -270,25 +272,10 @@ class Rollup {
                       return [col_id, v.doc, v.data]
                     })
                     console.log(txs)
-                    /*
-                    const start = Date.now()
-                    const zkp = await this.zkdb.genRollupProof(txs)
-                    console.log("zkp generated...", Date.now() - start)
-                    */
                     this.hash = this.zkdb.tree.F.toObject(
                       this.zkdb.tree.root,
                     ).toString()
                     console.log("zkp hash:", this.hash)
-                    /*
-                      const start2 = Date.now()
-                    const zkp2 = await this.zkdb.genProof({
-                      json: diffs[0].data,
-                      col_id: 0,
-                      path: "name",
-                      id: "Bob",
-                    })
-                    console.log("zkp generated2...", Date.now() - start2)
-                    */
                   }
                 } else {
                   // [TODO] need to handle this
@@ -420,7 +407,9 @@ class Rollup {
   }
 
   async initDB() {
-    console.log(`Owner Account: ${this.owner}`)
+    console.log(
+      `[${this.srcTxId}] Owner Account: ${this.owner}.......................................................`,
+    )
     await this.initWAL()
     await this.initOffchain()
     await this.initZKDB()
@@ -601,6 +590,37 @@ class Rollup {
       }
 
       this.syncer = await new AO(this.aos).init(this.bundler)
+      // we need recovery here....read tx from SU
+      console.log("recovery...........................", this.contractTxId)
+      const res = await fetch(
+        `http://localhost:4003/${this.contractTxId}`,
+      ).then(r => r.json())
+      if (res.error) {
+        console.log(res.error)
+      } else {
+        let items = 0
+        for (let v of res.edges) {
+          const v2 = v.node
+          try {
+            const json = JSON.parse(v2.message.data)
+            for (const v3 of json?.diffs ?? []) {
+              items++
+              let col_id = this.cols[v3.collection]
+              if (isNil(col_id)) {
+                col_id = await this.zkdb.addCollection()
+                // colnumber not consistent
+                this.cols[v3.collection] = col_id
+              }
+              await this.zkdb.insert(col_id, v3.doc, v3.data)
+            }
+            this.hash = this.zkdb.tree.F.toObject(
+              this.zkdb.tree.root,
+            ).toString()
+          } catch (e) {}
+        }
+        console.log("zkp hash:", this.hash, items, "items recovered")
+        console.log(this.cols)
+      }
       this.init_warp = true
       return
     }
@@ -751,32 +771,6 @@ class Rollup {
           }
           this.wal.set(t, "txs", `${t.id}`).then(async res => {
             if (!res.success) console.log("wal error")
-            /*
-              if (diff.length > 0) {
-              if (this.txid === "testdb") {
-              for (const v of diff) {
-                const res = await this.zkdb.insert(0, v.doc, v.data)
-                }
-
-              let txs = diff.map(v => {
-                return [0, v.doc, v.data]
-              })
-              console.log(txs)
-              const start = Date.now()
-              const zkp = await this.zkdb.genRollupProof(txs)
-              console.log("zkp generated...", Date.now() - start)
-              const start2 = Date.now()
-              console.log("this is diff", diff[0].data)
-              const zkp2 = await this.zkdb.genProof({
-                json: diff[0].data,
-                col_id: 0,
-                path: "age",
-                id: "bob",
-              })
-              console.log("zkp generated2...", Date.now() - start2)
-              }
-              
-            }*/
           })
           this.last = Date.now()
           for (let k in this.plugins) {

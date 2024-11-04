@@ -15,7 +15,6 @@ describe("WeaveDB on AO", function () {
 
   before(async () => {
     ;({ opt } = await setup({ cache: true }))
-
     // testing in insecure mode, never do that in production
     test = new Test({
       aos: opt.ao,
@@ -76,10 +75,7 @@ describe("WeaveDB on AO", function () {
     await wait(2000)
 
     // update the DB (via node)
-    const db2 = new DB({
-      rpc: "localhost:9090",
-      contractTxId,
-    })
+    const db2 = new DB({ rpc: "localhost:9090", contractTxId })
     const Bob = { name: "Bob" }
     const tx2 = await db2.set(Bob, "ppl", "Bob", {
       privateKey: admin.privateKey,

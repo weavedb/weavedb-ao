@@ -90,8 +90,8 @@ export default function Home() {
                         {err
                           ? "The Node is Offline"
                           : isNil(info)
-                          ? "-"
-                          : info.dbs.length}
+                            ? "-"
+                            : info.dbs.length}
                       </Box>
                     </Box>
                   </Box>
@@ -138,7 +138,7 @@ export default function Home() {
                           sx={{ borderRight: "1px solid #ddd" }}
                         ></Box>
                         <Box flex={1}>
-                          <Box sx={{ color: "#999" }}>Warp Contract Tx ID</Box>
+                          <Box sx={{ color: "#999" }}>AO Process ID</Box>
                           <Box sx={{ fontSize: "14px" }}>
                             <Box>{db.contractTxId ?? "None"}</Box>
                           </Box>

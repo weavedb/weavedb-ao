@@ -178,7 +178,7 @@ export default function Home() {
                 </Flex>
                 <Flex pt={2} mt={2} sx={{ borderTop: "1px solid #ddd" }}>
                   <Box flex={1}>
-                    <Box sx={{ color: "#999" }}>Contract TxID</Box>
+                    <Box sx={{ color: "#999" }}>AO Process ID</Box>
                     <Box sx={{ fontSize: "14px" }}>{router.query.db}</Box>
                   </Box>
                   <Box
@@ -187,7 +187,7 @@ export default function Home() {
                     sx={{ borderRight: "1px solid #ddd" }}
                   ></Box>
                   <Box flex={1}>
-                    <Box sx={{ color: "#999" }}>Transaction ID</Box>
+                    <Box sx={{ color: "#999" }}>Message ID</Box>
                     <Box sx={{ fontSize: "14px" }}>{tx ?? "-"}</Box>
                   </Box>
                   <Box
@@ -220,7 +220,7 @@ export default function Home() {
                     color="#666"
                     fontSize="16px"
                   >
-                    Transaction Info{isNostr ? " | Nostr Event" : null}
+                    Message Info{isNostr ? " | Nostr Event" : null}
                   </Box>
                   <Box
                     w="100%"
@@ -240,7 +240,7 @@ export default function Home() {
                             align="left"
                             color="#666"
                           >
-                            Transaction ID:
+                            Message ID:
                           </Box>
                           <Box as="td" px={4} py={2}>
                             {tx_info.txid}
@@ -278,11 +278,11 @@ export default function Home() {
                           </Box>
                           <Box as="td" px={4} py={2}>
                             {dayjs(
-                              tx_info.tx_ts ?? tx_info.blk_ts ?? 0
+                              tx_info.tx_ts ?? tx_info.blk_ts ?? 0,
                             ).fromNow()}{" "}
                             (
                             {dayjs(tx_info.tx_ts ?? tx_info.blk_ts ?? 0).format(
-                              "llll"
+                              "llll",
                             )}
                             )
                           </Box>
@@ -471,7 +471,7 @@ export default function Home() {
                             align="left"
                             color="#666"
                           >
-                            Warp Bundle:
+                            AO Bundle:
                           </Box>
                           <Box
                             as="td"
@@ -483,7 +483,7 @@ export default function Home() {
                               "-"
                             ) : (
                               <Link
-                                href={`https://sonar.warp.cc/#/app/interaction/${tx_info.warp}?network=mainnet`}
+                                href={`https://ao.link/#/message/${tx_info.warp}`}
                                 target="_blank"
                               >
                                 <Box color="#763AAC">{tx_info.warp}</Box>

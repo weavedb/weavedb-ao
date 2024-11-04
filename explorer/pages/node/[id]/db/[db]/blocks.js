@@ -83,7 +83,7 @@ export default function Home() {
           const _blks = await db.cget(
             "blocks",
             ["height", "desc"],
-            ["endBefore", blks[0]]
+            ["endBefore", blks[0]],
           )
           if (_blks.length > 0) setBlks(concat(_blks, blks))
         }
@@ -167,13 +167,13 @@ export default function Home() {
                         <Box
                           as="a"
                           color="#763AAC"
-                          href={`https://sonar.warp.cc/#/app/contract/${db_info.contractTxId}?network=mainnet`}
+                          href={`https://ao.link/#/message/${db_info.contractTxId}`}
                           target="_blank"
                         >
                           {db_info.contractTxId}
                         </Box>
                       ) : (
-                        router.query?.db ?? "-"
+                        (router.query?.db ?? "-")
                       )}
                     </Box>
                   </Box>
@@ -236,7 +236,7 @@ export default function Home() {
                           Txn
                         </Box>
                         <Box as="td" p={2} w="70px">
-                          Warp TxId
+                          AO Message ID
                         </Box>
                         <Box as="td" p={2} w="70px">
                           Date
@@ -272,7 +272,7 @@ export default function Home() {
                                   <Box
                                     as="a"
                                     target="_blank"
-                                    href={`https://sonar.warp.cc/#/app/interaction/${v.txid}?network=mainnet`}
+                                    href={`https://ao.link/#/message/${v.txid}`}
                                     color="#763AAC"
                                     onClick={e => e.stopPropagation()}
                                   >
@@ -304,7 +304,7 @@ export default function Home() {
                         "blocks",
                         ["height", "desc"],
                         ["startAfter", last(blks)],
-                        20
+                        20,
                       )
                       setBlks(concat(blks, _blks))
                       setIsnext(_blks.length === 20)
