@@ -30,11 +30,17 @@ async function deploy() {
     verifierDB.address,
     committer.address,
   )
-  return { myru, committer }
+  const MyMRU = await ethers.getContractFactory("MultiOPRU")
+  const mymru = await MyMRU.deploy(
+    verifierRU.address,
+    verifierDB.address,
+    committer.address,
+  )
+  return { mymru, myru, committer }
 }
 
 describe("WeaveDB AO with zkJSON", function () {
-  let myru, committer, ru
+  let myru, committer, ru, mymru
   let admin, network, bundler, test, base, arweave, opt
   this.timeout(0)
 
@@ -61,6 +67,7 @@ describe("WeaveDB AO with zkJSON", function () {
   beforeEach(async () => {
     const dep = await loadFixture(deploy)
     myru = dep.myru
+    mymru = dep.mymru
     committer = dep.committer
   })
   it("should verify rollup transactions", async function () {
@@ -72,6 +79,7 @@ describe("WeaveDB AO with zkJSON", function () {
     await wait(2000)
     const stats = await db.node({ op: "stats" })
     expect(stats).to.eql({ dbs: [] })
+
     // add a DB to node
     const tx = await db.admin(
       {
@@ -114,6 +122,7 @@ describe("WeaveDB AO with zkJSON", function () {
     })
     expect(tx2.success).to.eql(true)
     expect(await db2.get("ppl", "Bob")).to.eql(Bob)
+
     // check rollup
     await wait(5000)
     const ao = new AO(opt.ao)
@@ -128,6 +137,7 @@ describe("WeaveDB AO with zkJSON", function () {
       ).out,
     )
     expect(b).to.eql(Bob)
+
     // check zkp
     let hash = null
     try {
@@ -151,6 +161,106 @@ describe("WeaveDB AO with zkJSON", function () {
       await myru.qString([col_id, toIndex("Bob"), ...path("name")], zkp),
     ).to.eql("Bob")
 
+    return
+  })
+  it.only("should verify multi rollup transactions", async function () {
+    const db = new DB({
+      rpc: "localhost:9090",
+      contractTxId: "testdb",
+      arweave: network,
+    })
+    await wait(2000)
+    const stats = await db.node({ op: "stats" })
+    expect(stats).to.eql({ dbs: [] })
+
+    for (const i of [1, 2, 3]) {
+      // add a DB to node
+      const key = "testdb-" + i
+      const doc = "Bob-" + i
+      const tx = await db.admin(
+        {
+          op: "add_db",
+          key,
+          db: {
+            app: "http://localhost:3000",
+            name: "WDB-" + i,
+            rollup: true,
+            owner: admin.address,
+          },
+        },
+        { privateKey: admin.privateKey },
+      )
+      expect(tx.success).to.eql(true)
+
+      // deploy L1 AO contract (via node)
+      const { contractTxId, srcTxId } = await db.admin(
+        {
+          op: "deploy_contract",
+          key,
+          type: "ao",
+          module: opt.ao.module,
+          scheduler: opt.ao.scheduler,
+        },
+        { privateKey: admin.privateKey },
+      )
+      expect((await db.node({ op: "stats" })).dbs[0].data.rollup).to.eql(true)
+
+      await wait(2000)
+
+      // update the DB (via node)
+      const db2 = new DB({
+        rpc: "localhost:9090",
+        contractTxId,
+      })
+      const Bob = { name: doc }
+      const tx2 = await db2.set(Bob, "ppl", doc, {
+        privateKey: admin.privateKey,
+      })
+      expect(tx2.success).to.eql(true)
+      expect(await db2.get("ppl", doc)).to.eql(Bob)
+
+      // check rollup
+      await wait(5000)
+      const ao = new AO(opt.ao)
+      const b = JSON.parse(
+        (
+          await ao.dry({
+            pid: contractTxId,
+            act: "Get",
+            tags: { Query: JSON.stringify(["ppl", doc]) },
+            get: { name: "Result", json: true },
+          })
+        ).out,
+      )
+      expect(b).to.eql(Bob)
+
+      // check zkp
+      let hash = null
+      try {
+        hash = (await db.node({ op: "hash", key })).hash
+      } catch (e) {
+        console.log(e)
+      }
+      const { col_id, zkp } = await db.node({
+        op: "zkp",
+        key,
+        collection: "ppl",
+        doc,
+        path: "name",
+      })
+      expect(hash).to.eql(zkp[21])
+
+      await mymru.commitRoot(contractTxId, hash)
+
+      // query from Solidity
+      expect(
+        await mymru.qString(
+          contractTxId,
+          [col_id, toIndex(doc), ...path("name")],
+          zkp,
+        ),
+      ).to.eql(doc)
+    }
     return
   })
 })

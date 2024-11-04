@@ -416,6 +416,7 @@ class Rollup {
     await this.initWarp()
     await this.initPlugins()
   }
+
   /*
   async recoverWAL() {
     this.recovering = true
