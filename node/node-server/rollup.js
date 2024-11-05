@@ -128,7 +128,7 @@ class Rollup {
     if (this.rollup) this.bundle()
   }
 
-  async genZKP(col, doc, path) {
+  async genZKP(col, doc, path, query) {
     let col_id = this.cols[col]
     let zkp = null
     if (isNil(col_id)) return { err: "collection doesn't exist", zkp }
@@ -142,13 +142,14 @@ class Rollup {
     if (isNil(json[path])) return { err: "path doesn't exist", zkp }
     try {
       const start = Date.now()
-      zkp = await this.zkdb.genProof({
+      let params = {
         json,
         col_id,
         path,
         id: doc,
-      })
-      console.log("zkp generated...", Date.now() - start)
+      }
+      if (query) params.query = query
+      zkp = await this.zkdb.genProof(params)
     } catch (e) {
       console.log(e)
       return { err: e }
@@ -934,6 +935,7 @@ process.on("message", async msg => {
       msg.collection,
       msg.doc,
       msg.path,
+      msg.query,
     )
     process.send({
       op,
