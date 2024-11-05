@@ -38,7 +38,7 @@
     "weavedb-sdk-node": "^0.45.2",
     "ws": "^8.14.2",
     "yargs": "^17.6.2",
-    "zkjson": "^0.3.1"
+    "zkjson": "^0.3.2"
   },
   "devDependencies": {
     "arlocal": "^1.1.65",

@@ -111,10 +111,10 @@ class Rollup {
       console.log(e)
     }
   }
-  zkp(collection, doc, path, id, res) {
+  zkp(collection, doc, path, query, id, res) {
     this.cb[id] = res
     try {
-      this.db.send({ op: "zkp", id, collection, doc, path })
+      this.db.send({ op: "zkp", id, collection, doc, path, query })
     } catch (e) {
       console.log(e)
     }
@@ -260,8 +260,18 @@ class VM {
       const parsed = this.parseQuery(call, callback)
       const { type, res, nocache, txid, func, query, isAdmin } = parsed
       if (isAdmin) {
-        let { op, module, scheduler, key, db, type, collection, doc, path } =
-          JSON.parse(query).query
+        let {
+          op,
+          module,
+          scheduler,
+          key,
+          db,
+          type,
+          collection,
+          doc,
+          path,
+          query: query2,
+        } = JSON.parse(query).query
         const auth = { privateKey: this.conf.admin }
         let err, signer
         switch (op) {
@@ -288,6 +298,7 @@ class VM {
               collection,
               doc,
               path,
+              query2,
               ++this.count,
               (err, res) => {
                 callback(null, {
