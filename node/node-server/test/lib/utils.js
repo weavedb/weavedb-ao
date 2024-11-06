@@ -29,8 +29,10 @@ class Test {
     network,
     ao = false,
     cosmwasm = false,
+    admin_contract,
   }) {
     this.aos = aos
+    this.admin_contract = admin_contract
     this.snapshot = snapshot
     this.sequencerUrl = sequencerUrl
     this.apiKey = apiKey
@@ -59,6 +61,7 @@ class Test {
       await this.addFunds(this.bundler)
     } else {
       console.log("bundler already exists")
+      await this.addFunds(this.bundler)
     }
     if (!this.bundler2) {
       this.bundler2 = await this.arweave.wallets.generate()
@@ -83,6 +86,7 @@ class Test {
     this.conf = {
       aos: this.aos,
       ao: this.base,
+      admin_contract: this.admin_contract,
       snapshot: this.snapshot,
       sequencerUrl: this.sequencerUrl,
       apiKey: this.apiKey,

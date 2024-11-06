@@ -146,10 +146,11 @@ class VM {
     if (!isNil(dbname)) this.conf.dbname = dbname
     // TODO: more prisice validations
     this.conf.dbname ??= "weavedb"
-    if (!isNil(this.bundler)) throw Error("bundler is not defined")
-    if (!isNil(this.owner)) throw Error("owner is not defined")
-    if (!isNil(this.admin)) throw Error("admin is not defined")
-    if (!isNil(this.rollups)) throw Error("rollups are not defined")
+    if (isNil(this.conf.bundler)) throw Error("bundler is not defined")
+    if (isNil(this.conf.admin_contract))
+      throw Error("admin_contractr is not defined")
+    if (isNil(this.conf.admin)) throw Error("admin is not defined")
+    if (isNil(this.conf.rollups)) throw Error("rollups are not defined")
     this.admin = new Wallet(this.conf.admin)
     console.log(`Rollup Admin: ${this.admin.address}`)
     this.rollups = {}
@@ -318,21 +319,21 @@ class VM {
             break
           case "deploy_contract":
             ;({ err, signer } = await validate(JSON.parse(query), txid))
-            if (signer !== this.admin.address.toLowerCase()) {
+            const _db = await this.admin_db.get("dbs", key)
+            if (isNil(_db)) {
+              callback(null, { result: null, err: `${key} doesn't exists` })
+              return
+            } else if (signer !== _db.admin) {
               callback(null, {
                 result: null,
-                err: `signer [${signer}] is not admin [${this.admin.address.toLowerCase()}]`,
+                err: `signer [${signer}] is not DB admin [${db.admin}]`,
               })
               return
             } else if (isNil(key)) {
               callback(null, { result: null, err: "key is not specified" })
               return
             } else {
-              const _db = await this.admin_db.get("dbs", key)
-              if (isNil(_db)) {
-                callback(null, { result: null, err: `${key} doesn't exists` })
-                return
-              } else if (!isNil(_db.contractTxId)) {
+              if (!isNil(_db.contractTxId)) {
                 callback(null, {
                   result: null,
                   err: `${_db.contractTxId} already deployed`,
@@ -447,13 +448,54 @@ class VM {
             break
           case "add_db":
             ;({ err, signer } = await validate(JSON.parse(query), txid))
-            if (signer !== this.admin.address.toLowerCase()) {
+            const ao = await new AO(this.conf.aos).init(this.conf.bundler)
+            let token = "0"
+            try {
+              const { out } = await ao.dry({
+                pid: this.conf.admin_contract,
+                act: "Balance",
+                tags: { Target: signer },
+                get: "Balance",
+              })
+              token = out || "0"
+            } catch (e) {
+              console.log(e)
+            }
+            if (BigInt(token) < BigInt("100000000000000")) {
               callback(null, {
                 result: null,
-                err: `signer [${signer}] is not admin [${this.admin.address.toLowerCase()}]`,
+                err: `signer [${signer}] does not have enough token`,
               })
               return
-            } else if (isNil(key)) {
+            }
+            let _err2 = null
+            try {
+              const {
+                out,
+                err: err2,
+                res,
+              } = await ao.msg({
+                pid: this.conf.admin_contract,
+                act: "Transfer",
+                tags: {
+                  Sender: signer,
+                  Recipient: ao.ar.addr,
+                  Quantity: "100000000000000",
+                },
+                get: { obj: { recipient: "Recipient" } },
+              })
+              _err2 = err2
+              if (out.recipient === this.conf.admin_contract)
+                _err2 = "wrong recipient"
+            } catch (e) {
+              _err2 = e
+            }
+            if (_err2) {
+              console.log(_err2)
+              callback(null, { result: null, err: `token transfer failde` })
+              return
+            }
+            if (isNil(key)) {
               callback(null, { result: null, err: "key is not specified" })
               return
             } else if (!isNil(await this.admin_db.get("dbs", key))) {
@@ -464,15 +506,6 @@ class VM {
               return
             } else if (isNil(db.owner)) {
               callback(null, { result: null, err: "owner is missing" })
-            } else if (
-              Array.isArray(db.owner)
-                ? !all(isAddress)(db.owner)
-                : !isAddress(db.owner)
-            ) {
-              callback(null, {
-                result: null,
-                err: "owner is not a valid EVM address",
-              })
             } else if (db.rollup !== true && db.contractTxId) {
               callback(null, {
                 result: null,
@@ -480,6 +513,7 @@ class VM {
               })
               return
             }
+            db.admin = signer
             const tx = await this.admin_db.set(db, "dbs", key, auth)
 
             if (db.contractTxId) {

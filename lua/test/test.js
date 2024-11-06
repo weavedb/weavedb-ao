@@ -58,6 +58,7 @@ describe("WeaveDB", function () {
     expect((await ao.dry({ pid, act: "Info", get: "Name" })).out).to.eql(
       "Testnet DB",
     )
+
     await ao.msg({ pid, act: "Mint", tags: { Quantity: "100" } })
     expect(
       (await ao.dry({ pid, act: "Balances", get: { data: true, json: true } }))
