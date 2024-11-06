@@ -26,6 +26,7 @@
     "snarkjs": "^0.7.2",
     "weavedb-node-client": "^0.45.2",
     "weavedb-sdk-node": "^0.45.2",
+    "yargs": "^17.7.2",
     "zkjson": "^0.3.1"
   },
   "license": "MIT"

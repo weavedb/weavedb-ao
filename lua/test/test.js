@@ -1,11 +1,12 @@
 import { setup, ok, fail } from "aonote/test/helpers.js"
 import { expect } from "chai"
-import { AR, AO, Profile, Note, Notebook } from "aonote"
+import { AR, AO } from "aonote"
 import { readFileSync } from "fs"
 import { resolve } from "path"
 
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
-describe("Atomic Notes", function () {
+
+describe("WeaveDB", function () {
   this.timeout(0)
   let ao, opt, profile, ar, thumbnail, banner
 
@@ -57,11 +58,7 @@ describe("Atomic Notes", function () {
     expect((await ao.dry({ pid, act: "Info", get: "Name" })).out).to.eql(
       "Testnet DB",
     )
-    await ao.msg({
-      pid,
-      act: "Mint",
-      tags: { Quantity: "100" },
-    })
+    await ao.msg({ pid, act: "Mint", tags: { Quantity: "100" } })
     expect(
       (await ao.dry({ pid, act: "Balances", get: { data: true, json: true } }))
         .out[ao.ar.addr],
