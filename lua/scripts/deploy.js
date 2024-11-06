@@ -42,5 +42,21 @@ const main = async () => {
     (await ao.dry({ pid, act: "Balances", get: { data: true, json: true } }))
       .out[ao.ar.addr],
   )
+
+  const data2 = readFileSync(
+    resolve(__dirname, "../../lua/contracts/weavedb_node.lua"),
+    "utf8",
+  )
+
+  const { pid: pid2 } = await ao.spwn({})
+  await ao.wait({ pid: pid2 })
+
+  const { mid: mid2 } = await ao.load({
+    pid: pid2,
+    data: data2,
+    fills: { PARENT: pid, SOURCE: pid },
+  })
+
+  console.log(pid2)
 }
 main()

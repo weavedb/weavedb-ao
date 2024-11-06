@@ -69,7 +69,7 @@ Handlers.add(
   "transfer",
   Handlers.utils.hasMatchingTag("Action", "Transfer"),
   function (msg)
-    assert(ao.env.Process.Owner == msg.From, 'Only owner can execute!')
+    assert(ao.env.Process.Owner == msg.From, 'Only owner can execute!'..msg.From..":"..ao.env.Process.Owner)
     assert(type(msg.Tags.Sender) == 'string', 'Sender is required!')
     assert(type(msg.Tags.Recipient) == 'string', 'Recipient is required!')
     assert(type(msg.Tags.Quantity) == 'string', 'Quantity is required!')
