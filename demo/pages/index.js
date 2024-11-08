@@ -9,6 +9,8 @@ import { abi } from "@/lib/utils"
 const contractTxId = process.env.NEXT_PUBLIC_PROCESS
 const network = { host: "localhost", port: 4000, protocol: "http" }
 const { Contract, getDefaultProvider } = require("ethers")
+import About from "@/components/About"
+import Footer from "@/components/Footer"
 import {
   Image,
   Flex,
@@ -210,7 +212,7 @@ export default function Home({ _date = null }) {
   const [showCode6, setShowCode6] = useState(false)
   const [profiles, setProfiles] = useState([])
   const [favs, setFavs] = useState([])
-  const [tab, setTab] = useState("create")
+  const [tab, setTab] = useState("about")
   const [hash, setHash] = useState(null)
   const [committing, setCommitting] = useState({})
   const [generating, setGenerating] = useState(false)
@@ -545,7 +547,9 @@ export default function Home({ _date = null }) {
         </Flex>
       </Flex>
       <Flex justify="center" p={10} bg="#5137C5" color="#9C89F6">
-        {tab === "create" ? (
+        {tab === "about" ? (
+          <About {...{ setTab }} />
+        ) : tab === "create" ? (
           <Box w="100%" maxW="1150px">
             <Flex>
               <Box flex={1} mr={4}>
@@ -2634,9 +2638,179 @@ export default function Home({ _date = null }) {
             </Flex>
           </Box>
         ) : (
-          <Box w="100%" maxW="1150px"></Box>
+          <Box w="100%" maxW="1150px">
+            {map(v => {
+              return map(v2 => {
+                return (
+                  <Box p={4}>
+                    <Box
+                      onClick={() => alert("Coming Soon!")}
+                      p={4}
+                      color="#9C89F6"
+                      sx={{
+                        cursor: "pointer",
+                        ":hover": { opacity: 0.75 },
+                        borderRadius: "5px",
+                        border: "#9C89F6 1px solid",
+                      }}
+                    >
+                      <Box fontWeight="bold" fontSize="20px">
+                        <Box mr={4} as="i" className="fas fa-plus" />
+                        {v2.title}
+                      </Box>
+                    </Box>
+                  </Box>
+                )
+              })(v)
+            })([
+              [
+                {
+                  title: "Decentralized Social Apps",
+                },
+                {
+                  title: "zkOracles",
+                },
+                {
+                  title: "Token / Data Bridges",
+                },
+              ],
+              [
+                {
+                  title: "zkNFT",
+                },
+                {
+                  title: "DeSci",
+                },
+                {
+                  title: "Blockchain History",
+                },
+              ],
+              [
+                {
+                  title: "Private Databases",
+                },
+                {
+                  title: "Decentalized Point Systems",
+                },
+                {
+                  title: "AI Autonomous Databases",
+                },
+              ],
+            ])}
+          </Box>
         )}
       </Flex>
+      {tab === "about" ? (
+        <>
+          <Flex justify="center">
+            <Box w="100%" maxW="1150px" py={20}>
+              <Box fontWeight="bold" fontSize="20px" px={4} color="#9C89F6">
+                Backers
+              </Box>
+              <Box
+                mb={4}
+                fontWeight="bold"
+                fontSize="35px"
+                px={4}
+                color="#3C3C43"
+              >
+                Supported Worldwide by Industry's Best
+              </Box>
+              <Flex align="center" wrap="wrap" justify="center">
+                {map(v => {
+                  return v.name ? (
+                    <Link target="_blank" href={v.href ?? "/"}>
+                      <Flex
+                        sx={{ ":hover": { opacity: 0.75 } }}
+                        mx={4}
+                        my={2}
+                        direction="column"
+                        justify="center"
+                        align="center"
+                      >
+                        <Box align="center" fontWeight="bold" fontSize="26px">
+                          {v.name}
+                        </Box>
+                        <Box
+                          fontSize="16px"
+                          align="center"
+                          color={v.color ?? "#034337"}
+                        >
+                          {v.at}
+                        </Box>
+                      </Flex>
+                    </Link>
+                  ) : (
+                    <Link target="_blank" href={v.href ?? "/"}>
+                      <Image
+                        src={v.img}
+                        height={v.height ?? "50px"}
+                        mx={4}
+                        my={2}
+                        py={v.py ?? 0}
+                        sx={{ ":hover": { opacity: 0.75 } }}
+                      />
+                    </Link>
+                  )
+                })([
+                  {
+                    img: "permanent-ventures.webp",
+                    href: "http://permanent.ventures",
+                  },
+                  { img: "iosg.png", href: "https://iosg.vc" },
+                  { img: "mask.svg", href: "https://mask.io" },
+                  { img: "forward-research.png", href: "https://fwd.g8way.io" },
+                  {
+                    img: "hansa.svg",
+                    py: 2,
+                    href: "https://www.hansa.capital",
+                  },
+                  {
+                    img: "next-web-capital.webp",
+                    height: "80px",
+                    href: "https://nextweb.capital",
+                  },
+                  { img: "cmtd.png", py: 2, href: "https://cmt.digital" },
+                  {
+                    img: "formless-capital.webp",
+                    href: "https://formless.capital",
+                  },
+                  {
+                    name: "Scott Moore",
+                    at: "Gitcoin Founder",
+                    href: "https://www.gitcoin.co",
+                  },
+                  { img: "cogitent.png", href: "https://cogitent.ventures" },
+                  {
+                    name: "YY Lai",
+                    at: "Signum Capital",
+                    color: "#0082B9",
+                    href: "https://signum.capital",
+                  },
+                  { img: "hub71.svg", py: 2, href: "https://hub71.com" },
+                ])}
+              </Flex>
+            </Box>
+          </Flex>
+          <Flex h="250px" justify="center" bg="#9C89F6">
+            <Box w="100%" maxW="1150px" py={20}>
+              <Box fontWeight="bold" fontSize="20px" px={4} color="#ddd">
+                Ecosystem
+              </Box>
+              <Box
+                color="#5137C5"
+                mb={4}
+                fontWeight="bold"
+                fontSize="35px"
+                px={4}
+              >
+                Who's Building on WeaveDB & zkJSON
+              </Box>
+            </Box>
+          </Flex>
+        </>
+      ) : null}
+      <Footer />
     </>
   )
 }
