@@ -1,8 +1,7 @@
 const { abi } = require("@/lib/utils")
 const { Wallet, getDefaultProvider, Contract } = require("ethers")
-const contractTxId = process.env.NEXT_PUBLIC_PROCESS
 const provider = getDefaultProvider("sepolia", {
-  infura: process.env.NEXT_PUBLIC_INFURA_KEY,
+  alchemy: process.env.NEXT_PUBLIC_ALCHEMY_KEY,
 })
 import DB from "weavedb-node-client"
 const privateKey = process.env.PRIVATE_KEY
