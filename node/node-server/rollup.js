@@ -1,3 +1,4 @@
+const { connect } = require("@permaweb/ao-scheduler-utils")
 const { DB: ZKDB } = require("zkjson")
 const { AO } = require("aonote")
 const fs = require("fs")
@@ -594,9 +595,14 @@ class Rollup {
       this.syncer = await new AO(this.aos).init(this.bundler)
       // we need recovery here....read tx from SU
       console.log("recovery...........................", this.contractTxId)
-      const res = await fetch(
-        `http://localhost:4003/${this.contractTxId}`,
-      ).then(r => r.json())
+      let opt = {}
+      if (!isNil(this.aos?.aoconnect)) {
+        opt.GRAPHQL_URL = "http://localhost:4000/graphql"
+      }
+      const { validate, locate, raw } = connect(opt)
+      let { url, address } = await locate(this.contractTxId)
+      if (url === "http://su") url = "http://localhost:4003"
+      const res = await fetch(`${url}/${this.contractTxId}`).then(r => r.json())
       if (res.error) {
         console.log(res.error)
       } else {
