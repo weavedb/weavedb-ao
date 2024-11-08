@@ -596,8 +596,8 @@ class Rollup {
       // we need recovery here....read tx from SU
       console.log("recovery...........................", this.contractTxId)
       let opt = {}
-      if (!isNil(this.aos?.aoconnect)) {
-        opt.GRAPHQL_URL = "http://localhost:4000/graphql"
+      if (!isNil(this.aos?.aoconnect?.GATEWAY_URL)) {
+        opt.GRAPHQL_URL = `${this.aos.aoconnect.GATEWAY_URL}/graphql`
       }
       const { validate, locate, raw } = connect(opt)
       let { url, address } = await locate(this.contractTxId)

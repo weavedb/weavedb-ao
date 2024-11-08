@@ -6,7 +6,6 @@ const { toIndex, path, encodeQuery } = require("zkjson")
 import { useEffect, useState } from "react"
 import DB from "weavedb-client"
 import { abi } from "@/lib/utils"
-const contractTxId = process.env.NEXT_PUBLIC_PROCESS
 const network = { host: "localhost", port: 4000, protocol: "http" }
 const { Contract, getDefaultProvider } = require("ethers")
 import About from "@/components/About"
@@ -34,10 +33,11 @@ import {
   includes,
   is,
   trim,
+  filter,
 } from "ramda"
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
 const provider = getDefaultProvider("sepolia", {
-  infura: process.env.NEXT_PUBLIC_INFURA_KEY,
+  alchemy: process.env.NEXT_PUBLIC_ALCHEMY_KEY,
 })
 const rpc = process.env.NEXT_PUBLIC_RPC
 const opt =
@@ -114,8 +114,9 @@ const commit = async ({ _alert, committing, dbname2, setCommitting, dbs }) => {
   }
   return updated
 }
-const codeDeploy = ({ dbname }) => {
-  return `await db.admin({ op: "add_db", key: "${dbname}", db: { owner }})
+const codeDeploy = ({ dbname, owner }) => {
+  return `const owner = "${owner}"
+await db.admin({ op: "add_db", key: "${dbname}", db: { owner }})
 await db.admin({ op: "deploy_contract", key: "${dbname}" })
 `
 }
@@ -192,6 +193,7 @@ const codeDeploy6 = ({ txid, path, zkp, fn }) => {
 }
 
 export default function Home({ _date = null }) {
+  const [connecting, setConnecting] = useState(false)
   const [depositing, setDepositing] = useState(false)
   const toast = useToast()
   const [op, setOp] = useState("Deposit")
@@ -225,7 +227,7 @@ export default function Home({ _date = null }) {
   const [query, setQuery] = useState("")
   const [tar, setTar] = useState("name")
   const [age, setAge] = useState(5)
-  const [married, setMarried] = useState(true)
+  const [married, setMarried] = useState("true")
   const [latency, setLatency] = useState(null)
   const [latency2, setLatency2] = useState(null)
   const [latency3, setLatency3] = useState(null)
@@ -245,7 +247,7 @@ export default function Home({ _date = null }) {
   const [addr, setAddr] = useState(null)
   const [balance, setBalance] = useState(0)
   const [deposit, setDeposit] = useState(0)
-
+  const [stats, setStats] = useState(null)
   const _path = isNil(zkp)
     ? null
     : [Number(zkp.col_id).toString(), toIndex(zkp.data.name), ...path(zkp.tar)]
@@ -260,20 +262,28 @@ export default function Home({ _date = null }) {
 
   useEffect(() => {
     ;(async () => {
-      const db = new DB({ rpc, contractTxId: dbname, arweave: network })
-      const stats = await db.node({ op: "stats" })
-      setDBs(stats.dbs)
-      if (stats.dbs[0]) {
-        setDBName2(stats.dbs[0].id ?? null)
-        const db2 = new DB({
-          rpc,
-          contractTxId: stats.dbs[0].id,
-          arweave: network,
-        })
-        const _cols = await db2.listCollections()
-        setSelectedCol(_cols[0] ?? null)
-        setCols(_cols)
-        if (!isNil(_cols[0])) setProfiles(await db2.get(_cols[0]))
+      try {
+        const db = new DB({ rpc, contractTxId: dbname, arweave: network })
+        const stats = await db.node({ op: "stats" })
+        setStats(stats)
+        const _dbs = filter(
+          v => !isNil(v.data.admin) && !isNil(v.data.contractTxId),
+        )(stats.dbs)
+        setDBs(_dbs)
+        if (_dbs[0]) {
+          setDBName2(_dbs[0].id ?? null)
+          const db2 = new DB({
+            rpc,
+            contractTxId: _dbs[0].id,
+            arweave: network,
+          })
+          const _cols = await db2.listCollections()
+          setSelectedCol(_cols[0] ?? null)
+          setCols(_cols)
+          if (!isNil(_cols[0])) setProfiles(await db2.get(_cols[0]))
+        }
+      } catch (e) {
+        console.log(e)
       }
     })()
   }, [])
@@ -281,7 +291,10 @@ export default function Home({ _date = null }) {
     ? ""
     : (indexBy(prop("id"), dbs)[zkp.db]?.data?.contractTxId ?? "")
   const deploy_ok = !/^\s*$/.test(dbname) && deposit * 1 >= 100 * 10 ** 12
-  const deposit_ok = amount * 1 > 0 && balance * 1 >= amount * 10 ** 12
+  let deposit_ok = amount * 1 > 0 && balance * 1 >= amount * 10 ** 12
+  if (op === "Withdraw") {
+    deposit_ok = amount * 1 > 0 && deposit * 1 >= amount * 10 ** 12
+  }
   const add_ok = !/^\s*$/.test(colName)
   const save_ok = !/^\s*$/.test(name)
   const query_ok = search === "multi" || !/^\s*$/.test(query)
@@ -317,6 +330,7 @@ export default function Home({ _date = null }) {
           name: "$contains_none",
         },
       ]
+  const dbmap = indexBy(prop("id"))(dbs ?? [])
   return (
     <>
       <Flex
@@ -354,32 +368,76 @@ export default function Home({ _date = null }) {
               cursor: "pointer",
             }}
             onClick={async () => {
-              await arweaveWallet.connect([
-                "ACCESS_ADDRESS",
-                "SIGN_TRANSACTION",
-                "ACCESS_PUBLIC_KEY",
-              ])
-              const addr = await arweaveWallet.getActiveAddress()
-              const ao = new AO(opt)
-              const { out } = await ao.dry({
-                pid: process.env.NEXT_PUBLIC_TDB,
-                act: "Balance",
-                tags: { Target: addr },
-                get: "Balance",
-              })
-              setBalance(out * 1)
+              if (!connecting) {
+                let err = null
+                if (addr) {
+                  if (confirm("Disconnect your wallet?")) {
+                    setAddr(null)
+                    toast({
+                      title: "Wallet Disconnected!",
+                      status: "success",
+                      duration: 5000,
+                      isClosable: true,
+                    })
+                  }
+                } else {
+                  setConnecting(true)
 
-              const { out: out2 } = await ao.dry({
-                pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                act: "Balance",
-                tags: { Target: addr },
-                get: "Balance",
-              })
-              setDeposit(out2 * 1)
-              setAddr(addr)
+                  try {
+                    await arweaveWallet.connect([
+                      "ACCESS_ADDRESS",
+                      "SIGN_TRANSACTION",
+                      "ACCESS_PUBLIC_KEY",
+                    ])
+                    const addr = await arweaveWallet.getActiveAddress()
+                    const ao = new AO(opt)
+                    const { out } = await ao.dry({
+                      pid: process.env.NEXT_PUBLIC_TDB,
+                      act: "Balance",
+                      tags: { Target: addr },
+                      get: "Balance",
+                    })
+                    setBalance(out * 1)
+
+                    const { out: out2 } = await ao.dry({
+                      pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                      act: "Balance",
+                      tags: { Target: addr },
+                      get: "Balance",
+                    })
+                    setDeposit(out2 * 1)
+                    setAddr(addr)
+                    toast({
+                      title: "Wallet Connected!",
+                      status: "success",
+                      description: addr,
+                      duration: 5000,
+                      isClosable: true,
+                    })
+                  } catch (e) {
+                    err = e.toString()
+                  }
+                }
+                setConnecting(false)
+                if (err) {
+                  toast({
+                    title: "Something Went Wrong!",
+                    status: "error",
+                    description: err,
+                    duration: 5000,
+                    isClosable: true,
+                  })
+                }
+              }
             }}
           >
-            {addr ? addr.slice(0, 10) : "Connect Wallet"}
+            {connecting ? (
+              <Box as="i" className="fas fa-spin fa-circle-notch" />
+            ) : addr ? (
+              addr.slice(0, 10)
+            ) : (
+              "Connect Wallet"
+            )}
           </Flex>
         </Flex>
       </Flex>
@@ -524,6 +582,7 @@ export default function Home({ _date = null }) {
           {map(v => {
             return (
               <Flex
+                key={v.key}
                 sx={{
                   borderRadius: "5px 5px 0 0",
                   cursor: "pointer",
@@ -573,117 +632,126 @@ export default function Home({ _date = null }) {
                     <Box mx={2}>{deposit / 1000000000000} tDB</Box>
                   </Flex>
                 </Flex>
-                <Box
-                  my={4}
-                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                  p={4}
-                  bg="white"
-                >
-                  <Flex>
-                    <Box mr={4}>
-                      <Box mb={1}>Operation</Box>
-                      <Select
-                        w="150px"
-                        value={op}
-                        onChange={e => setOp(e.target.value)}
-                      >
-                        <option value="Deposit">Deposit</option>
-                        <option value="Withdraw">Withdraw</option>
-                      </Select>
-                    </Box>
-                    <Box mr={4}>
-                      <Box mb={1}>Amount (tDB)</Box>
-                      <Input
-                        value={amount}
-                        onChange={e => {
-                          if (
-                            !Number.isNaN(+e.target.value) &&
-                            Math.round(e.target.value * 1) === +e.target.value
-                          ) {
-                            setAmount(e.target.value)
-                          }
-                        }}
-                      />
-                    </Box>
-                    <Box flex={1} />
-                    <Flex align="flex-end">
-                      <Flex
-                        h="40px"
-                        justify="center"
-                        w="100px"
-                        align="center"
-                        bg={deposit_ok ? "#5137C5" : "#999"}
-                        color="white"
-                        py={1}
-                        px={3}
-                        sx={{
-                          borderRadius: "5px",
-                          ":hover": { opacity: 0.75 },
-                          cursor: deposit_ok ? "pointer" : "default",
-                        }}
-                        onClick={async () => {
-                          if (!depositing && deposit_ok) {
-                            setDepositing(true)
-                            try {
-                              await arweaveWallet.connect([
-                                "ACCESS_ADDRESS",
-                                "SIGN_TRANSACTION",
-                                "ACCESS_PUBLIC_KEY",
-                              ])
-                              const addr =
-                                await arweaveWallet.getActiveAddress()
-                              const ao = await new AO(opt).init(arweaveWallet)
-                              const winston = "000000000000"
-                              if (op === "Deposit") {
-                                const { err, res } = await ao.msg({
-                                  pid: process.env.NEXT_PUBLIC_TDB,
-                                  act: "Transfer",
-                                  tags: {
-                                    Recipient:
-                                      process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                                    Quantity: `${amount}${winston}`,
-                                  },
-                                })
-                              } else {
-                                const { err, res } = await ao.msg({
-                                  pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                                  act: "Withdraw",
-                                  tags: { Quantity: `${amount}${winston}` },
-                                })
-                              }
-                              await wait(3000)
-                              const { out } = await ao.dry({
-                                pid: process.env.NEXT_PUBLIC_TDB,
-                                act: "Balance",
-                                tags: { Target: addr },
-                                get: "Balance",
-                              })
-                              setBalance(out * 1)
-
-                              const { out: out2 } = await ao.dry({
-                                pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                                act: "Balance",
-                                tags: { Target: addr },
-                                get: "Balance",
-                              })
-                              setDeposit(out2 * 1)
-                              setAddr(addr)
-                            } catch (e) {
-                              console.log(e)
+                {!addr ? (
+                  <Box mt={6} px={4}>
+                    Connect wallet.
+                  </Box>
+                ) : (
+                  <Box
+                    my={4}
+                    sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                    p={4}
+                    bg="white"
+                  >
+                    <Flex>
+                      <Box mr={4}>
+                        <Box mb={1}>Operation</Box>
+                        <Select
+                          w="150px"
+                          value={op}
+                          onChange={e => setOp(e.target.value)}
+                        >
+                          <option value="Deposit">Deposit</option>
+                          <option value="Withdraw">Withdraw</option>
+                        </Select>
+                      </Box>
+                      <Box mr={4}>
+                        <Box mb={1}>Amount (tDB)</Box>
+                        <Input
+                          value={amount}
+                          onChange={e => {
+                            if (
+                              !Number.isNaN(+e.target.value) &&
+                              Math.round(e.target.value * 1) === +e.target.value
+                            ) {
+                              setAmount(e.target.value)
                             }
-                            setDepositing(false)
-                          }
-                        }}
-                      >
-                        {depositing ? (
-                          <Box as="i" className="fas fa-spin fa-circle-notch" />
-                        ) : (
-                          op
-                        )}
+                          }}
+                        />
+                      </Box>
+                      <Box flex={1} />
+                      <Flex align="flex-end">
+                        <Flex
+                          h="40px"
+                          justify="center"
+                          w="100px"
+                          align="center"
+                          bg={deposit_ok ? "#5137C5" : "#999"}
+                          color="white"
+                          py={1}
+                          px={3}
+                          sx={{
+                            borderRadius: "5px",
+                            ":hover": { opacity: 0.75 },
+                            cursor: deposit_ok ? "pointer" : "default",
+                          }}
+                          onClick={async () => {
+                            if (!depositing && deposit_ok) {
+                              setDepositing(true)
+                              try {
+                                await arweaveWallet.connect([
+                                  "ACCESS_ADDRESS",
+                                  "SIGN_TRANSACTION",
+                                  "ACCESS_PUBLIC_KEY",
+                                ])
+                                const addr =
+                                  await arweaveWallet.getActiveAddress()
+                                const ao = await new AO(opt).init(arweaveWallet)
+                                const winston = "000000000000"
+                                if (op === "Deposit") {
+                                  const { err, res } = await ao.msg({
+                                    pid: process.env.NEXT_PUBLIC_TDB,
+                                    act: "Transfer",
+                                    tags: {
+                                      Recipient:
+                                        process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                                      Quantity: `${amount}${winston}`,
+                                    },
+                                  })
+                                } else {
+                                  const { err, res } = await ao.msg({
+                                    pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                                    act: "Withdraw",
+                                    tags: { Quantity: `${amount}${winston}` },
+                                  })
+                                }
+                                await wait(3000)
+                                const { out } = await ao.dry({
+                                  pid: process.env.NEXT_PUBLIC_TDB,
+                                  act: "Balance",
+                                  tags: { Target: addr },
+                                  get: "Balance",
+                                })
+                                setBalance(out * 1)
+
+                                const { out: out2 } = await ao.dry({
+                                  pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                                  act: "Balance",
+                                  tags: { Target: addr },
+                                  get: "Balance",
+                                })
+                                setDeposit(out2 * 1)
+                                setAddr(addr)
+                              } catch (e) {
+                                console.log(e)
+                              }
+                              setDepositing(false)
+                            }
+                          }}
+                        >
+                          {depositing ? (
+                            <Box
+                              as="i"
+                              className="fas fa-spin fa-circle-notch"
+                            />
+                          ) : (
+                            op
+                          )}
+                        </Flex>
                       </Flex>
                     </Flex>
-                  </Flex>
-                </Box>
+                  </Box>
+                )}
                 <Flex mt={6} mb={4} align="center">
                   <Flex
                     px={6}
@@ -704,163 +772,183 @@ export default function Home({ _date = null }) {
                     <Box mx={2}>100 tDB</Box>
                   </Flex>
                 </Flex>
-                <Box
-                  my={4}
-                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                  p={4}
-                  bg="white"
-                >
-                  <Flex>
-                    <Box mr={4}>
-                      <Box mb={1}>Select Node</Box>
-                      <Select w="150px">
-                        <option>test.wdb.ae</option>
-                      </Select>
-                    </Box>
-                    <Box mr={4}>
-                      <Box mb={1}>New DB Name</Box>
-                      <Input
-                        value={dbname}
-                        onChange={e => setDBName(e.target.value)}
-                      />
-                    </Box>
-                    <Box flex={1} />
-                    <Flex align="flex-end">
-                      <Flex
-                        h="40px"
-                        justify="center"
-                        w="100px"
-                        align="center"
-                        bg={deploy_ok ? "#5137C5" : "#999"}
-                        color="white"
-                        py={1}
-                        px={3}
-                        sx={{
-                          borderRadius: "5px",
-                          ":hover": { opacity: 0.75 },
-                          cursor: deploy_ok ? "pointer" : "default",
-                        }}
-                        onClick={async () => {
-                          if (!deploying && deploy_ok) {
-                            await arweaveWallet.connect([
-                              "ACCESS_ADDRESS",
-                              "SIGN_TRANSACTION",
-                              "ACCESS_PUBLIC_KEY",
-                            ])
-                            const addr = await arweaveWallet.getActiveAddress()
-                            const ao = new AO(opt)
-                            const { out: out2 } = await ao.dry({
-                              pid: process.env.NEXT_PUBLIC_TDB,
-                              act: "Balances",
-                              get: { data: true, json: true },
-                            })
-                            const { out } = await ao.dry({
-                              pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                              act: "Balances",
-                              get: { data: true, json: true },
-                            })
-                            const deposit = out?.[addr] ?? 0
-                            if (deposit < 100000000000000) {
-                              toast({
-                                title: "Something Went Wrong!",
-                                status: "error",
-                                description:
-                                  "Your deposit of tDB token is not enough.",
-                                duration: 5000,
-                                isClosable: true,
+                {!addr ? (
+                  <Box mt={6} px={4}>
+                    Connect wallet.
+                  </Box>
+                ) : (
+                  <Box
+                    my={4}
+                    sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                    p={4}
+                    bg="white"
+                  >
+                    <Flex>
+                      <Box mr={4}>
+                        <Box mb={1}>Select Node</Box>
+                        <Select w="150px">
+                          <option>test.wdb.ae</option>
+                        </Select>
+                      </Box>
+                      <Box mr={4}>
+                        <Box mb={1}>New DB Name</Box>
+                        <Input
+                          value={dbname}
+                          onChange={e => setDBName(e.target.value)}
+                        />
+                      </Box>
+                      <Box flex={1} />
+                      <Flex align="flex-end">
+                        <Flex
+                          h="40px"
+                          justify="center"
+                          w="100px"
+                          align="center"
+                          bg={deploy_ok ? "#5137C5" : "#999"}
+                          color="white"
+                          py={1}
+                          px={3}
+                          sx={{
+                            borderRadius: "5px",
+                            ":hover": { opacity: 0.75 },
+                            cursor: deploy_ok ? "pointer" : "default",
+                          }}
+                          onClick={async () => {
+                            if (!deploying && deploy_ok) {
+                              await arweaveWallet.connect([
+                                "ACCESS_ADDRESS",
+                                "SIGN_TRANSACTION",
+                                "ACCESS_PUBLIC_KEY",
+                              ])
+                              const addr =
+                                await arweaveWallet.getActiveAddress()
+                              const ao = new AO(opt)
+                              const { out: out2 } = await ao.dry({
+                                pid: process.env.NEXT_PUBLIC_TDB,
+                                act: "Balances",
+                                get: { data: true, json: true },
                               })
-                              return
-                            }
-                            setDeploying(true)
-                            const db = new DB({
-                              rpc,
-                              contractTxId: dbname,
-                              arweave: network,
-                            })
-                            try {
-                              const start = Date.now()
-                              const tx = await db.admin(
-                                {
-                                  op: "add_db",
-                                  key: dbname,
-                                  db: {
-                                    rollup: true,
-                                    owner: addr,
+                              const { out } = await ao.dry({
+                                pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                                act: "Balances",
+                                get: { data: true, json: true },
+                              })
+                              const deposit = out?.[addr] ?? 0
+                              if (deposit < 100000000000000) {
+                                toast({
+                                  title: "Something Went Wrong!",
+                                  status: "error",
+                                  description:
+                                    "Your tDB token deposit is not enough.",
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                                return
+                              }
+                              setDeploying(true)
+                              const db = new DB({
+                                rpc,
+                                contractTxId: dbname,
+                                arweave: network,
+                              })
+                              try {
+                                const start = Date.now()
+                                const tx = await db.admin(
+                                  {
+                                    op: "add_db",
+                                    key: dbname,
+                                    db: {
+                                      rollup: true,
+                                      owner: addr,
+                                    },
                                   },
-                                },
-                                { ar2: arweaveWallet },
-                              )
-                              const { contractTxId, srcTxId } = await db.admin(
-                                {
-                                  op: "deploy_contract",
-                                  key: dbname,
-                                  type: "ao",
-                                  module:
-                                    "YTNXvQu2x21DD6Pm8zicVBghB-BlnM5VRrVRyfhBPP8",
-                                  scheduler:
-                                    "-_vZZQMEnvJmiIIfHfp_KuuV6ud2b9VSThfTmYytYQ8",
-                                },
-                                { ar2: arweaveWallet },
-                              )
-                              const duration = Date.now() - start
-                              setLatency4({
-                                dbname,
-                                txid: contractTxId,
-                                duration,
-                              })
-                              const stats = await db.node({ op: "stats" })
-                              setDBs(stats.dbs)
-                              setDBName("")
-                              toast({
-                                title: `DB Deployed in ${duration} ms!`,
-                                description: contractTxId,
-                                status: "success",
-                                duration: 5000,
-                                isClosable: true,
-                              })
-                            } catch (e) {
-                              toast({
-                                title: "Something Went Wrong!",
-                                status: "error",
-                                description: e.toString(),
-                                duration: 5000,
-                                isClosable: true,
-                              })
+                                  { ar2: arweaveWallet },
+                                )
+                                const { contractTxId, srcTxId } =
+                                  await db.admin(
+                                    {
+                                      op: "deploy_contract",
+                                      key: dbname,
+                                      type: "ao",
+                                      module:
+                                        "YTNXvQu2x21DD6Pm8zicVBghB-BlnM5VRrVRyfhBPP8",
+                                      scheduler:
+                                        "-_vZZQMEnvJmiIIfHfp_KuuV6ud2b9VSThfTmYytYQ8",
+                                    },
+                                    { ar2: arweaveWallet },
+                                  )
+                                const duration = Date.now() - start
+                                setLatency4({
+                                  dbname,
+                                  txid: contractTxId,
+                                  duration,
+                                })
+                                const stats = await db.node({ op: "stats" })
+                                setStats(stats)
+                                const _dbs = filter(
+                                  v =>
+                                    !isNil(v.data.admin) &&
+                                    !isNil(v.data.contractTxId),
+                                )(stats.dbs)
+                                setDBs(_dbs)
+                                setDBName("")
+                                toast({
+                                  title: `DB Deployed in ${duration} ms!`,
+                                  description: contractTxId,
+                                  status: "success",
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                              } catch (e) {
+                                toast({
+                                  title: "Something Went Wrong!",
+                                  status: "error",
+                                  description: e.toString(),
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                              }
+                              setDeploying(false)
                             }
-                            setDeploying(false)
-                          }
-                        }}
-                      >
-                        {deploying ? (
-                          <Box as="i" className="fas fa-spin fa-circle-notch" />
-                        ) : (
-                          "Deploy"
-                        )}
+                          }}
+                        >
+                          {deploying ? (
+                            <Box
+                              as="i"
+                              className="fas fa-spin fa-circle-notch"
+                            />
+                          ) : (
+                            "Deploy"
+                          )}
+                        </Flex>
                       </Flex>
                     </Flex>
-                  </Flex>
-                  <Flex
-                    fontSize="12px"
-                    mt={4}
-                    justify="center"
-                    sx={{
-                      textDecoration: "underline",
-                      cursor: "pointer",
-                      ":hover": { opacity: 0.75 },
-                    }}
-                    onClick={() => setShowCode(!showCode)}
-                  >
-                    {showCode ? "Hide JS Code" : "Show JS Code"}
-                  </Flex>
+                    <Flex
+                      fontSize="12px"
+                      mt={4}
+                      justify="center"
+                      sx={{
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                        ":hover": { opacity: 0.75 },
+                      }}
+                      onClick={() => setShowCode(!showCode)}
+                    >
+                      {showCode ? "Hide JS Code" : "Show JS Code"}
+                    </Flex>
 
-                  {!showCode ? null : (
-                    <Box fontSize="12px" mt={2}>
-                      <SyntaxHighlighter language="javascript" style={a11yDark}>
-                        {codeDeploy({ dbname })}
-                      </SyntaxHighlighter>
-                    </Box>
-                  )}
-                </Box>
+                    {!showCode ? null : (
+                      <Box fontSize="12px" mt={2}>
+                        <SyntaxHighlighter
+                          language="javascript"
+                          style={a11yDark}
+                        >
+                          {codeDeploy({ dbname, owner: addr ?? "" })}
+                        </SyntaxHighlighter>
+                      </Box>
+                    )}
+                  </Box>
+                )}
                 <Flex justify="flex-end" align="center" mb={6}>
                   {latency4 ? (
                     <>
@@ -923,6 +1011,73 @@ export default function Home({ _date = null }) {
                 </Flex>
               </Box>
               <Box flex={1} ml={4}>
+                <Flex mb={4} align="center">
+                  <Flex
+                    px={4}
+                    py={1}
+                    bg="#9C89F6"
+                    color="white"
+                    sx={{ borderRadius: "50px" }}
+                  >
+                    Node Info
+                  </Flex>
+                  <Box flex={1} />
+                </Flex>
+                <Box
+                  mb={6}
+                  w="100%"
+                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                  p={4}
+                  fontSize="14px"
+                >
+                  <Flex align="center">
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      gRPC URL
+                    </Flex>
+                    <Box px={4}>https://test.wdb.ae</Box>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Bundler
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/entity/${stats?.bundler}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {stats?.bundler}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Subledger
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {process.env.NEXT_PUBLIC_ADMIN_CONTRACT}
+                      </Box>
+                    </Link>
+                  </Flex>
+                </Box>
                 <Box>
                   <Flex
                     fontSize="14px"
@@ -946,6 +1101,7 @@ export default function Home({ _date = null }) {
                   {map(v => {
                     return (
                       <Flex
+                        key={v.id}
                         px={4}
                         sx={{
                           borderBottom: "1px solid #9C89F6",
@@ -983,19 +1139,21 @@ export default function Home({ _date = null }) {
                           </Link>
                         </Box>
                         <Box flex={1} p={2} fontSize="12px">
-                          <Link
-                            target="_blank"
-                            href={`https://ao.link/#/entity/${v.data.admin}`}
-                          >
-                            <Box
-                              sx={{
-                                cursor: "pointer",
-                                ":hover": { opacity: 0.75 },
-                              }}
+                          {!v.data.admin ? null : (
+                            <Link
+                              target="_blank"
+                              href={`https://ao.link/#/entity/${v.data.admin}`}
                             >
-                              {v.data.admin.slice(0, 20)}...
-                            </Box>
-                          </Link>
+                              <Box
+                                sx={{
+                                  cursor: "pointer",
+                                  ":hover": { opacity: 0.75 },
+                                }}
+                              >
+                                {v.data.admin.slice(0, 20)}...
+                              </Box>
+                            </Link>
+                          )}
                         </Box>
                       </Flex>
                     )
@@ -1039,6 +1197,7 @@ export default function Home({ _date = null }) {
                               setSelectedData(null)
                             }
                           } else {
+                            setProfiles([])
                             setSelectedData(null)
                           }
                         }}
@@ -1068,7 +1227,6 @@ export default function Home({ _date = null }) {
                     </Box>
                   </Flex>
                 </Box>
-
                 {tab === "query" ? (
                   <>
                     <Flex mb={4}>
@@ -1082,151 +1240,161 @@ export default function Home({ _date = null }) {
                         Add Collection
                       </Flex>
                     </Flex>
-                    <Box
-                      my={4}
-                      sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                      p={4}
-                      bg="white"
-                    >
-                      <Flex>
-                        <Box mr={4} flex={1}>
-                          <Box mb={1}>New Collection Name</Box>
-                          <Input
-                            value={colName}
-                            onChange={e => setColName(e.target.value)}
-                          />
-                        </Box>
-                        <Box mr={4} flex={1}>
-                          <Box mb={1}>Data Schema</Box>
-                          <Select>
-                            <option>Simple Profile</option>
-                          </Select>
-                        </Box>
-                        <Flex align="flex-end">
-                          <Flex
-                            bg={add_ok ? "#5137C5" : "#999"}
-                            color="white"
-                            py={2}
-                            px={3}
-                            w="70px"
-                            justify="center"
-                            sx={{
-                              borderRadius: "5px",
-                              ":hover": { opacity: 0.75 },
-                              cursor: add_ok ? "pointer" : "default",
-                            }}
-                            onClick={async () => {
-                              if (add_ok) {
-                                let err = null
-                                let txid = null
-                                let txid2 = null
-                                try {
-                                  const contractTxId = indexBy(prop("id"), dbs)[
-                                    dbname2
-                                  ].data.contractTxId
-                                  const db = new DB({
-                                    rpc,
-                                    contractTxId,
-                                    arweave: network,
-                                  })
-                                  const start = Date.now()
-                                  const rules = [["write", [["allow()"]]]]
-                                  const tx2 = await db.setRules(
-                                    rules,
-                                    colName,
-                                    {
-                                      ar2: arweaveWallet,
-                                    },
-                                  )
-                                  if (!tx2.success) {
-                                    err = "error"
-                                  } else {
-                                    txid = tx2.originalTxId
-                                    const schema = {
-                                      type: "object",
-                                      required: ["name", "age", "married"],
-                                      properties: {
-                                        name: { type: "string" },
-                                        age: { type: "number" },
-                                        married: { type: "boolean" },
-                                        favorites: {
-                                          type: "array",
-                                          items: { type: "string" },
-                                        },
-                                      },
-                                    }
-                                    const tx3 = await db.setSchema(
-                                      schema,
+                    {!addr ? (
+                      <Box mt={6} px={4}>
+                        Connect wallet.
+                      </Box>
+                    ) : (
+                      <Box
+                        my={4}
+                        sx={{
+                          borderRadius: "5px",
+                          border: "1px solid #9C89F6",
+                        }}
+                        p={4}
+                        bg="white"
+                      >
+                        <Flex>
+                          <Box mr={4} flex={1}>
+                            <Box mb={1}>New Collection Name</Box>
+                            <Input
+                              value={colName}
+                              onChange={e => setColName(e.target.value)}
+                            />
+                          </Box>
+                          <Box mr={4} flex={1}>
+                            <Box mb={1}>Data Schema</Box>
+                            <Select>
+                              <option>Simple Profile</option>
+                            </Select>
+                          </Box>
+                          <Flex align="flex-end">
+                            <Flex
+                              bg={add_ok ? "#5137C5" : "#999"}
+                              color="white"
+                              py={2}
+                              px={3}
+                              w="70px"
+                              justify="center"
+                              sx={{
+                                borderRadius: "5px",
+                                ":hover": { opacity: 0.75 },
+                                cursor: add_ok ? "pointer" : "default",
+                              }}
+                              onClick={async () => {
+                                if (add_ok) {
+                                  let err = null
+                                  let txid = null
+                                  let txid2 = null
+                                  try {
+                                    const contractTxId = indexBy(
+                                      prop("id"),
+                                      dbs,
+                                    )[dbname2].data.contractTxId
+                                    const db = new DB({
+                                      rpc,
+                                      contractTxId,
+                                      arweave: network,
+                                    })
+                                    const start = Date.now()
+                                    const rules = [["write", [["allow()"]]]]
+                                    const tx2 = await db.setRules(
+                                      rules,
                                       colName,
-                                      { ar2: arweaveWallet },
+                                      {
+                                        ar2: arweaveWallet,
+                                      },
                                     )
-                                    if (tx3.success) {
-                                      txid2 = tx3.originalTxId
-                                      setCols(await db.listCollections())
-                                      setLatency5({
-                                        dbname: dbname2,
-                                        duration: Date.now() - start,
-                                        txid,
-                                        txid2,
-                                      })
-                                      setSelectedCol(colName)
-                                      setProfiles([])
+                                    if (!tx2.success) {
+                                      err = "error"
                                     } else {
-                                      err = tx3.error.toString()
+                                      txid = tx2.originalTxId
+                                      const schema = {
+                                        type: "object",
+                                        required: ["name", "age", "married"],
+                                        properties: {
+                                          name: { type: "string" },
+                                          age: { type: "number" },
+                                          married: { type: "boolean" },
+                                          favorites: {
+                                            type: "array",
+                                            items: { type: "string" },
+                                          },
+                                        },
+                                      }
+                                      const tx3 = await db.setSchema(
+                                        schema,
+                                        colName,
+                                        { ar2: arweaveWallet },
+                                      )
+                                      if (tx3.success) {
+                                        txid2 = tx3.originalTxId
+                                        setCols(await db.listCollections())
+                                        setLatency5({
+                                          dbname: dbname2,
+                                          duration: Date.now() - start,
+                                          txid,
+                                          txid2,
+                                        })
+                                        setSelectedCol(colName)
+                                        setProfiles([])
+                                      } else {
+                                        err = tx3.error.toString()
+                                      }
                                     }
+                                  } catch (e) {
+                                    err = "error"
                                   }
-                                } catch (e) {
-                                  err = "error"
+                                  if (err) {
+                                    toast({
+                                      title: "Something Went Wrong!",
+                                      status: "error",
+                                      description: err,
+                                      duration: 5000,
+                                      isClosable: true,
+                                    })
+                                  } else {
+                                    toast({
+                                      title: "Collection Added!",
+                                      status: "success",
+                                      description: `${colName}`,
+                                      duration: 5000,
+                                      isClosable: true,
+                                    })
+                                  }
                                 }
-                                if (err) {
-                                  toast({
-                                    title: "Something Went Wrong!",
-                                    status: "error",
-                                    description: err,
-                                    duration: 5000,
-                                    isClosable: true,
-                                  })
-                                } else {
-                                  toast({
-                                    title: "Collection Added!",
-                                    status: "success",
-                                    description: `${colName}`,
-                                    duration: 5000,
-                                    isClosable: true,
-                                  })
-                                }
-                              }
-                            }}
-                          >
-                            Add
+                              }}
+                            >
+                              Add
+                            </Flex>
                           </Flex>
                         </Flex>
-                      </Flex>
-                      <Flex
-                        fontSize="12px"
-                        mt={4}
-                        justify="center"
-                        sx={{
-                          textDecoration: "underline",
-                          cursor: "pointer",
-                          ":hover": { opacity: 0.75 },
-                        }}
-                        onClick={() => setShowCode2(!showCode2)}
-                      >
-                        {showCode2 ? "Hide JS Code" : "Show JS Code"}
-                      </Flex>
+                        <Flex
+                          fontSize="12px"
+                          mt={4}
+                          justify="center"
+                          sx={{
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                            ":hover": { opacity: 0.75 },
+                          }}
+                          onClick={() => setShowCode2(!showCode2)}
+                        >
+                          {showCode2 ? "Hide JS Code" : "Show JS Code"}
+                        </Flex>
 
-                      {!showCode2 ? null : (
-                        <Box fontSize="12px" mt={2}>
-                          <SyntaxHighlighter
-                            language="javascript"
-                            style={a11yDark}
-                          >
-                            {codeDeploy2({ colName })}
-                          </SyntaxHighlighter>
-                        </Box>
-                      )}
-                    </Box>
+                        {!showCode2 ? null : (
+                          <Box fontSize="12px" mt={2}>
+                            <SyntaxHighlighter
+                              language="javascript"
+                              style={a11yDark}
+                            >
+                              {codeDeploy2({ colName })}
+                            </SyntaxHighlighter>
+                          </Box>
+                        )}
+                      </Box>
+                    )}
                     <Flex justify="flex-end" align="center" mb={6}>
                       {latency5 ? (
                         <>
@@ -1273,6 +1441,7 @@ export default function Home({ _date = null }) {
                         </>
                       ) : null}
                     </Flex>
+
                     <Flex mb={4}>
                       <Flex
                         px={6}
@@ -1284,195 +1453,207 @@ export default function Home({ _date = null }) {
                         Store Data on WeaveDB
                       </Flex>
                     </Flex>
-                    <Box
-                      my={4}
-                      sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                      p={4}
-                      bg="white"
-                    >
-                      <Flex>
-                        <Box>
-                          <Flex>
-                            <Box mr={4}>
-                              <Box mb={1}>Name</Box>
-                              <Input
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                              />
-                            </Box>
-                            <Box mr={4}>
-                              <Box mb={1}>Age</Box>
-                              <Select
-                                w="100px"
-                                value={age}
-                                onChange={e => setAge(e.target.value)}
-                              >
-                                {range(1, 100).map(v => (
-                                  <option>{v}</option>
-                                ))}
-                              </Select>
-                            </Box>
-                            <Box>
-                              <Box mb={1}>Married</Box>
-                              <Select
-                                w="100px"
-                                value={married}
-                                onChange={e => setMarried(e.target.value)}
-                              >
-                                {[true, false].map(v => (
-                                  <option value={v}>
-                                    {v ? "True" : "False"}
-                                  </option>
-                                ))}
-                              </Select>
-                            </Box>
-                          </Flex>
-                          <Box mt={4}>
-                            <Box mb={1}>Favorites</Box>
-                            <Flex>
-                              {map(v => {
-                                return (
-                                  <Flex
-                                    flex={1}
-                                    align="center"
-                                    sx={{
-                                      cursor: "pointer",
-                                      ":hover": { opacity: 0.75 },
-                                    }}
-                                    onClick={() => {
-                                      if (includes(v, favs)) {
-                                        setFavs(without([v], favs))
-                                      } else {
-                                        setFavs(append(v, favs))
-                                      }
-                                    }}
-                                  >
-                                    <Box
-                                      mr={2}
-                                      as="i"
-                                      className={
-                                        includes(v, favs)
-                                          ? "far fa-check-square"
-                                          : "far fa-square"
-                                      }
-                                    />
-                                    <Box flex={1}>{v}</Box>
-                                  </Flex>
-                                )
-                              })([
-                                "apple",
-                                "orange",
-                                "grape",
-                                "peach",
-                                "lemon",
-                              ])}
-                            </Flex>
-                          </Box>
-                        </Box>
-                      </Flex>
-                      <Flex
-                        fontSize="12px"
-                        mt={4}
-                        justify="center"
-                        sx={{
-                          textDecoration: "underline",
-                          cursor: "pointer",
-                          ":hover": { opacity: 0.75 },
-                        }}
-                        onClick={() => setShowCode3(!showCode3)}
-                      >
-                        {showCode3 ? "Hide JS Code" : "Show JS Code"}
-                      </Flex>
-
-                      {!showCode3 ? null : (
-                        <Box fontSize="12px" mt={2}>
-                          <SyntaxHighlighter
-                            language="javascript"
-                            style={a11yDark}
-                          >
-                            {codeDeploy3({
-                              name,
-                              age,
-                              married,
-                              favorites: favs,
-                              col: selectedCol,
-                            })}
-                          </SyntaxHighlighter>
-                        </Box>
-                      )}
-                      <Flex
-                        mt={4}
-                        bg={save_ok ? "#5137C5" : "#999"}
-                        color="white"
-                        py={2}
-                        px={3}
-                        justify="center"
+                    {!addr ? (
+                      <Box mt={6} px={4}>
+                        Connect wallet.
+                      </Box>
+                    ) : (
+                      <Box
+                        my={4}
                         sx={{
                           borderRadius: "5px",
-                          ":hover": { opacity: 0.75 },
-                          cursor: save_ok ? "pointer" : "default",
+                          border: "1px solid #9C89F6",
                         }}
-                        onClick={async () => {
-                          if (save_ok) {
-                            const contractTxId = indexBy(prop("id"), dbs)[
-                              dbname2
-                            ].data.contractTxId
-                            const db = new DB({
-                              rpc,
-                              contractTxId,
-                            })
-                            const ppl = {
-                              name,
-                              age: +age,
-                              married: married === "true" ? true : false,
-                              favorites: favs,
-                            }
-                            const start = Date.now()
-                            const tx3 = await db.set(ppl, selectedCol, name, {
-                              ar2: arweaveWallet,
-                            })
-                            if (tx3.success) {
-                              setLatency({
-                                dbname: dbname2,
-                                duration: Date.now() - start,
-                                txid: tx3.originalTxId,
-                              })
-                              setProfiles(await db.get(selectedCol))
-                              let updated = true
-                              setTimeout(async () => {
-                                do {
-                                  updated = await commit({
-                                    committing,
-                                    dbname2,
-                                    dbs,
-                                    setCommitting,
-                                    _alert: false,
-                                  })
-                                } while (updated)
-                              }, 5000)
-                              toast({
-                                title: "Doc Added!",
-                                status: "success",
-                                description: `${name}`,
-                                duration: 5000,
-                                isClosable: true,
-                              })
-                              setSelectedData(ppl)
-                            } else {
-                              toast({
-                                title: "Something Went Wrong!",
-                                status: "error",
-                                description: "error",
-                                duration: 5000,
-                                isClosable: true,
-                              })
-                            }
-                          }
-                        }}
+                        p={4}
+                        bg="white"
                       >
-                        Save
-                      </Flex>
-                    </Box>
+                        <Flex>
+                          <Box>
+                            <Flex>
+                              <Box mr={4}>
+                                <Box mb={1}>Name</Box>
+                                <Input
+                                  value={name}
+                                  onChange={e => setName(e.target.value)}
+                                />
+                              </Box>
+                              <Box mr={4}>
+                                <Box mb={1}>Age</Box>
+                                <Select
+                                  w="100px"
+                                  value={age}
+                                  onChange={e => setAge(e.target.value)}
+                                >
+                                  {range(1, 100).map(v => (
+                                    <option key={v} value={v}>
+                                      {v}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </Box>
+                              <Box>
+                                <Box mb={1}>Married</Box>
+                                <Select
+                                  w="100px"
+                                  value={married}
+                                  onChange={e => setMarried(e.target.value)}
+                                >
+                                  {[true, false].map(v => (
+                                    <option key={v} value={v}>
+                                      {v ? "True" : "False"}
+                                    </option>
+                                  ))}
+                                </Select>
+                              </Box>
+                            </Flex>
+                            <Box mt={4}>
+                              <Box mb={1}>Favorites</Box>
+                              <Flex>
+                                {map(v => {
+                                  return (
+                                    <Flex
+                                      key={v}
+                                      flex={1}
+                                      align="center"
+                                      sx={{
+                                        cursor: "pointer",
+                                        ":hover": { opacity: 0.75 },
+                                      }}
+                                      onClick={() => {
+                                        if (includes(v, favs)) {
+                                          setFavs(without([v], favs))
+                                        } else {
+                                          setFavs(append(v, favs))
+                                        }
+                                      }}
+                                    >
+                                      <Box
+                                        mr={2}
+                                        as="i"
+                                        className={
+                                          includes(v, favs)
+                                            ? "far fa-check-square"
+                                            : "far fa-square"
+                                        }
+                                      />
+                                      <Box flex={1}>{v}</Box>
+                                    </Flex>
+                                  )
+                                })([
+                                  "apple",
+                                  "orange",
+                                  "grape",
+                                  "peach",
+                                  "lemon",
+                                ])}
+                              </Flex>
+                            </Box>
+                          </Box>
+                        </Flex>
+                        <Flex
+                          fontSize="12px"
+                          mt={4}
+                          justify="center"
+                          sx={{
+                            textDecoration: "underline",
+                            cursor: "pointer",
+                            ":hover": { opacity: 0.75 },
+                          }}
+                          onClick={() => setShowCode3(!showCode3)}
+                        >
+                          {showCode3 ? "Hide JS Code" : "Show JS Code"}
+                        </Flex>
+
+                        {!showCode3 ? null : (
+                          <Box fontSize="12px" mt={2}>
+                            <SyntaxHighlighter
+                              language="javascript"
+                              style={a11yDark}
+                            >
+                              {codeDeploy3({
+                                name,
+                                age,
+                                married,
+                                favorites: favs,
+                                col: selectedCol,
+                              })}
+                            </SyntaxHighlighter>
+                          </Box>
+                        )}
+                        <Flex
+                          mt={4}
+                          bg={save_ok ? "#5137C5" : "#999"}
+                          color="white"
+                          py={2}
+                          px={3}
+                          justify="center"
+                          sx={{
+                            borderRadius: "5px",
+                            ":hover": { opacity: 0.75 },
+                            cursor: save_ok ? "pointer" : "default",
+                          }}
+                          onClick={async () => {
+                            if (save_ok) {
+                              const contractTxId = indexBy(prop("id"), dbs)[
+                                dbname2
+                              ].data.contractTxId
+                              const db = new DB({
+                                rpc,
+                                contractTxId,
+                              })
+                              const ppl = {
+                                name,
+                                age: +age,
+                                married: married === "true" ? true : false,
+                                favorites: favs,
+                              }
+                              const start = Date.now()
+                              const tx3 = await db.set(ppl, selectedCol, name, {
+                                ar2: arweaveWallet,
+                              })
+                              if (tx3.success) {
+                                setLatency({
+                                  dbname: dbname2,
+                                  duration: Date.now() - start,
+                                  txid: tx3.originalTxId,
+                                })
+                                setProfiles(await db.get(selectedCol))
+                                let updated = true
+                                setTimeout(async () => {
+                                  do {
+                                    updated = await commit({
+                                      committing,
+                                      dbname2,
+                                      dbs,
+                                      setCommitting,
+                                      _alert: false,
+                                    })
+                                  } while (updated)
+                                }, 5000)
+                                toast({
+                                  title: "Doc Added!",
+                                  status: "success",
+                                  description: `${name}`,
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                                setSelectedData(ppl)
+                              } else {
+                                toast({
+                                  title: "Something Went Wrong!",
+                                  status: "error",
+                                  description: "error",
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                              }
+                            }
+                          }}
+                        >
+                          Save
+                        </Flex>
+                      </Box>
+                    )}
                     <Flex justify="flex-end" align="center" mb={6}>
                       {latency ? (
                         <>
@@ -1726,7 +1907,10 @@ export default function Home({ _date = null }) {
                               const tx3 = await db.get(...q)
                               setData(tx3)
                               if (search === "single") setSelectedData(tx3)
-                              setLatency2(Date.now() - start)
+                              setLatency2({
+                                txid: contractTxId,
+                                duration: Date.now() - start,
+                              })
                               setWhich("WeaveDB Rollup")
                               setLoading(false)
                             }
@@ -1773,7 +1957,10 @@ export default function Home({ _date = null }) {
                                   })
                                 ).out,
                               )
-                              setLatency2(Date.now() - start)
+                              setLatency2({
+                                txid: contractTxId,
+                                duration: Date.now() - start,
+                              })
                               setWhich("AO Process")
                               setData(b)
                               setSelectedData(b)
@@ -1817,6 +2004,7 @@ export default function Home({ _date = null }) {
                             {map(v => {
                               return (
                                 <Flex
+                                  key={v.name}
                                   px={4}
                                   sx={{
                                     borderBottom: "1px solid #9C89F6",
@@ -1847,7 +2035,7 @@ export default function Home({ _date = null }) {
                           <Box
                             as="a"
                             target="_blank"
-                            href={`https://ao.link/#/entity/${contractTxId}`}
+                            href={`https://ao.link/#/entity/${latency2.txid}`}
                             sx={{ textDecoration: "underline" }}
                           >
                             AO Process
@@ -1862,7 +2050,7 @@ export default function Home({ _date = null }) {
                               px={2}
                               sx={{ borderRadius: "5px" }}
                             >
-                              {latency2} ms
+                              {latency2.duration} ms
                             </Box>
                           </Flex>
                         </>
@@ -1882,10 +2070,20 @@ export default function Home({ _date = null }) {
                         Generate ZKP
                       </Flex>
                       <Box flex={1} />
-                      Cost:
-                      <Box mx={2}>0 tDB</Box>
+                      <Flex>
+                        Your Deposit:
+                        <Box mx={2}>{deposit / 1000000000000} tDB</Box>
+                      </Flex>
+                      <Flex ml={4}>
+                        Cost:
+                        <Box mx={2}>0 tDB</Box>
+                      </Flex>
                     </Flex>
-                    {isNil(selectedData) ? (
+                    {!addr ? (
+                      <Box mt={6} px={4}>
+                        Connect wallet.
+                      </Box>
+                    ) : isNil(selectedData) ? (
                       <Box mt={6} px={4}>
                         Select a doc.
                       </Box>
@@ -2064,7 +2262,7 @@ export default function Home({ _date = null }) {
                                     toast({
                                       title: "ZKP Generated!",
                                       status: "success",
-                                      description: `${params.key} > ${params.collection} > ${params.doc} > ${params.path} (${qtype === "disclosure" ? "Selective Disclosure" : `$${qvalue}`})`,
+                                      description: `${params.key} > ${params.collection} > ${params.doc} > ${params.path} (${qtype === "disclosure" ? "Selective Disclosure" : `${qvalue}`})`,
                                       duration: 5000,
                                       isClosable: true,
                                     })
@@ -2464,7 +2662,9 @@ export default function Home({ _date = null }) {
 
                                     setQuerying(false)
                                     if (err) {
-                                      if (err.match(/match/)) {
+                                      if (err.match(/mismatch/)) {
+                                        err = "Root Mismatch"
+                                      } else if (err.match(/match/)) {
                                         err = "Network Error: Try again"
                                       } else {
                                         err = "Invalid ZKP"
@@ -2551,7 +2751,7 @@ export default function Home({ _date = null }) {
                                       dbname2: zkp.db,
                                       dbs,
                                       setCommitting,
-                                      _alert: false,
+                                      _alert: updated,
                                     })
                                   } while (updated)
                                 }}
@@ -2581,7 +2781,103 @@ export default function Home({ _date = null }) {
                   </>
                 )}
               </Box>
+
               <Box flex={1} ml={4}>
+                <Flex mb={4} align="center">
+                  <Flex
+                    px={4}
+                    py={1}
+                    bg="#9C89F6"
+                    color="white"
+                    sx={{ borderRadius: "50px" }}
+                  >
+                    Database Info
+                  </Flex>
+                  <Box flex={1} />
+                </Flex>
+                <Box
+                  mb={4}
+                  w="100%"
+                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                  p={4}
+                  fontSize="14px"
+                >
+                  <Flex align="center">
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      DB Name
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${dbname2}`}
+                    >
+                      <Box px={4}>{dbname2}</Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      AO Process
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/entity/${dbmap[dbname2]?.data?.contractTxId}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {dbmap[dbname2]?.data?.contractTxId}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Owner
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {dbmap[dbname2]?.data?.admin}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Collections
+                    </Flex>
+                    <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      [ {cols.length} ] {cols.join(", ")}
+                    </Box>
+                  </Flex>
+                </Box>
+                <Flex mb={2} align="center">
+                  {dbname2} <Box as="i" className="fas fa-angle-right" mx={2} />
+                  {!selectedCol ? (
+                    <Box>-</Box>
+                  ) : (
+                    <Box>
+                      {selectedCol} [ {profiles.length} items ]
+                    </Box>
+                  )}
+                </Flex>
                 <Box>
                   <Flex
                     fontSize="14px"
@@ -2608,6 +2904,7 @@ export default function Home({ _date = null }) {
                   {map(v => {
                     return (
                       <Flex
+                        key={v.name}
                         px={4}
                         sx={{
                           borderBottom: "1px solid #9C89F6",
@@ -2642,7 +2939,7 @@ export default function Home({ _date = null }) {
             {map(v => {
               return map(v2 => {
                 return (
-                  <Box p={4}>
+                  <Box p={4} key={v.title}>
                     <Box
                       onClick={() => alert("Coming Soon!")}
                       p={4}
@@ -2714,13 +3011,14 @@ export default function Home({ _date = null }) {
                 px={4}
                 color="#3C3C43"
               >
-                Supported Worldwide by Industry's Best
+                {`Supported Worldwide by Industry's Best`}
               </Box>
               <Flex align="center" wrap="wrap" justify="center">
                 {map(v => {
                   return v.name ? (
                     <Link target="_blank" href={v.href ?? "/"}>
                       <Flex
+                        key={v.url}
                         sx={{ ":hover": { opacity: 0.75 } }}
                         mx={4}
                         my={2}
@@ -2743,6 +3041,7 @@ export default function Home({ _date = null }) {
                   ) : (
                     <Link target="_blank" href={v.href ?? "/"}>
                       <Image
+                        key={v.url}
                         src={v.img}
                         height={v.height ?? "50px"}
                         mx={4}
@@ -2804,7 +3103,7 @@ export default function Home({ _date = null }) {
                 fontSize="35px"
                 px={4}
               >
-                Who's Building on WeaveDB & zkJSON
+                {`Who's Building on WeaveDB & zkJSON`}
               </Box>
             </Box>
           </Flex>

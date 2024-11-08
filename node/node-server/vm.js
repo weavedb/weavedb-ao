@@ -277,9 +277,19 @@ class VM {
         let err, signer
         switch (op) {
           case "stats":
+            const _arweave = this.conf.arweave ?? {
+              host: "arweave.net",
+              port: 443,
+              protocol: "https",
+            }
+            const arweave = Arweave.init(_arweave)
+            const bundler = await arweave.wallets.jwkToAddress(
+              this.conf.bundler,
+            )
             if (isNil(key)) {
               callback(null, {
                 result: JSON.stringify({
+                  bundler,
                   dbs: await this.admin_db.cget("dbs"),
                 }),
                 err: null,
@@ -287,6 +297,7 @@ class VM {
             } else {
               callback(null, {
                 result: JSON.stringify({
+                  bundler,
                   db: await this.admin_db.cget("dbs", key),
                 }),
                 err: null,
