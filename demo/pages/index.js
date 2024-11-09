@@ -492,50 +492,53 @@ export default function Home({ _date = null }) {
                         align="center"
                       >
                         <Box w="100px" p={2}>
-                          <Link
-                            target="_blank"
-                            href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${v.id}`}
+                          <Box
+                            sx={{
+                              cursor: "pointer",
+                              ":hover": { opacity: 0.75 },
+                              wordBreak: "break-all",
+                            }}
                           >
-                            <Box
-                              sx={{
-                                cursor: "pointer",
-                                ":hover": { opacity: 0.75 },
-                              }}
+                            <Link
+                              target="_blank"
+                              href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${v.id}`}
                             >
                               {v.id}
-                            </Box>
-                          </Link>
+                            </Link>
+                          </Box>
                         </Box>
                         <Box flex={1} p={2} fontSize="12px">
-                          <Link
-                            target="_blank"
-                            href={`https://ao.link/#/entity/${v.data.contractTxId}`}
+                          <Box
+                            sx={{
+                              cursor: "pointer",
+                              ":hover": { opacity: 0.75 },
+                              wordBreak: "break-all",
+                            }}
                           >
-                            <Box
-                              sx={{
-                                cursor: "pointer",
-                                ":hover": { opacity: 0.75 },
-                              }}
+                            <Link
+                              target="_blank"
+                              href={`https://ao.link/#/entity/${v.data.contractTxId}`}
                             >
                               {v.data.contractTxId.slice(0, 20)}...
-                            </Box>
-                          </Link>
+                            </Link>
+                          </Box>
                         </Box>
                         <Box flex={1} p={2} fontSize="12px">
                           {!v.data.admin ? null : (
-                            <Link
-                              target="_blank"
-                              href={`https://ao.link/#/entity/${v.data.admin}`}
+                            <Box
+                              sx={{
+                                cursor: "pointer",
+                                ":hover": { opacity: 0.75 },
+                                wordBreak: "break-all",
+                              }}
                             >
-                              <Box
-                                sx={{
-                                  cursor: "pointer",
-                                  ":hover": { opacity: 0.75 },
-                                }}
+                              <Link
+                                target="_blank"
+                                href={`https://ao.link/#/entity/${v.data.admin}`}
                               >
                                 {v.data.admin.slice(0, 20)}...
-                              </Box>
-                            </Link>
+                              </Link>
+                            </Box>
                           )}
                         </Box>
                       </Flex>
@@ -1154,8 +1157,8 @@ export default function Home({ _date = null }) {
                 </Box>
                 <Box>
                   <Flex
-                    fontSize="14px"
-                    px={4}
+                    fontSize={["12px", "14px"]}
+                    px={[2, 4]}
                     bg="white"
                     sx={{
                       borderRadius: "5px 5px 0 0",
@@ -1179,7 +1182,7 @@ export default function Home({ _date = null }) {
                     return (
                       <Flex
                         key={v.name}
-                        px={4}
+                        px={[2, 4]}
                         sx={{
                           borderBottom: "1px solid #9C89F6",
                           cursor: "pointer",
@@ -1984,12 +1987,12 @@ export default function Home({ _date = null }) {
                         ) : !data ? (
                           "data not found..."
                         ) : (
-                          <Box>
+                          <Box fontSize={["12px", "14px"]} w="100%">
                             <Flex
-                              fontSize="14px"
-                              px={4}
+                              px={[2, 4]}
                               color="white"
                               bg="#9C89F6"
+                              w="100%"
                               sx={{
                                 borderRadius: "5px 5px 0 0",
                                 borderBottom: "1px solid #9C89F6",
@@ -2011,8 +2014,9 @@ export default function Home({ _date = null }) {
                             {map(v => {
                               return (
                                 <Flex
+                                  w="100%"
                                   key={v.name}
-                                  px={4}
+                                  px={[2, 4]}
                                   sx={{
                                     borderBottom: "1px solid #9C89F6",
                                   }}
@@ -2036,7 +2040,7 @@ export default function Home({ _date = null }) {
                         )}
                       </Box>
                     </Box>
-                    <Flex justify="flex-end" align="center" mb={6}>
+                    <Flex justify="flex-end" align="center">
                       {latency2 ? (
                         <>
                           <Box flex={1} />
@@ -2807,7 +2811,7 @@ export default function Home({ _date = null }) {
         ) : (
           <Box w="100%" maxW="1150px" px={[4, 6, 10]}>
             <Flex wrap="wrap">
-              <Box w={["100%", null, null, "50%"]} pr={[0, null, null, 4]}>
+              <Box w="100%">
                 {map(v => {
                   return map(v2 => {
                     return (
