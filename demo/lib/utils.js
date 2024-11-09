@@ -370,4 +370,16 @@ const abi = [
   },
 ]
 
-module.exports = { abi }
+const opt =
+  process.env.NEXT_PUBLIC_NODE === "localhost"
+    ? {
+        ar: { port: 4000 },
+        aoconnect: {
+          MU_URL: "http://localhost:4002",
+          CU_URL: "http://localhost:4004",
+          GATEWAY_URL: "http://localhost:4000",
+        },
+      }
+    : {}
+
+module.exports = { abi, opt }
