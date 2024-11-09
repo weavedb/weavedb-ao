@@ -1119,7 +1119,14 @@ export default function Home({ _date = null }) {
                     >
                       Owner
                     </Flex>
-                    <Box flex={1} sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
+                    >
                       <Link
                         target="_blank"
                         href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
@@ -1133,7 +1140,7 @@ export default function Home({ _date = null }) {
                       justify="center"
                       bg="white"
                       w={["80px", "100px"]}
-                      sx={{ borderRadius: "5px" }}
+                      sx={{ borderRadius: "5px", wordBreak: "break-all" }}
                     >
                       Collections
                     </Flex>
@@ -1157,7 +1164,7 @@ export default function Home({ _date = null }) {
                 </Box>
                 <Box>
                   <Flex
-                    fontSize={["12px", "14px"]}
+                    fontSize={["10px", "12px", "14px"]}
                     px={[2, 4]}
                     bg="white"
                     sx={{
@@ -1821,7 +1828,7 @@ export default function Home({ _date = null }) {
                                 </Select>
                               </Box>
                               <Box flex={1}>
-                                <Box mt={[0, 4]} mb={1}>
+                                <Box mt={4} mb={1}>
                                   Value
                                   {includes(operator, [
                                     "in",
@@ -1926,7 +1933,7 @@ export default function Home({ _date = null }) {
                             }
                           }}
                         >
-                          Query Rollup (fast)
+                          Query Rollup
                         </Flex>
                         {search === "multi" ? null : (
                           <Flex
@@ -1977,7 +1984,7 @@ export default function Home({ _date = null }) {
                               setLoading(false)
                             }}
                           >
-                            Query AO (slow)
+                            Query AO
                           </Flex>
                         )}
                       </Flex>
@@ -1987,7 +1994,7 @@ export default function Home({ _date = null }) {
                         ) : !data ? (
                           "data not found..."
                         ) : (
-                          <Box fontSize={["12px", "14px"]} w="100%">
+                          <Box fontSize={["10px", "12px", "14px"]} w="100%">
                             <Flex
                               px={[2, 4]}
                               color="white"
