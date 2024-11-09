@@ -2,9 +2,10 @@ import { Image, Flex, Box } from "@chakra-ui/react"
 import { Link } from "arnext"
 
 export default function Footer({ setTab }) {
+  let ml = [4, 6]
   return (
     <Flex justify="center">
-      <Box w="100%" maxW="1150px" p={10}>
+      <Box w="100%" maxW="1150px" py={[6, 8, 10]} px={[4, 6, 10]}>
         <Flex align="center" color="#5137C5">
           <Box
             alignItems="center"
@@ -20,19 +21,19 @@ export default function Footer({ setTab }) {
             </Flex>
           </Box>
           <Box flex={1} />
-          <Flex align="center" wrap="wrap">
-            <Box ml={6}>Blog</Box>
-            <Box ml={6}>Docs</Box>
+          <Flex align="center" wrap="wrap" fontSize={["12px", "14px"]}>
+            <Box ml={ml}>Blog</Box>
+            <Box ml={ml}>Docs</Box>
             <Link href="https://scan.weavedb.dev" target="_blank">
-              <Box ml={6}>Scan</Box>
+              <Box ml={ml}>Scan</Box>
             </Link>
             <Link
               href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_TDB}`}
               target="_blank"
             >
-              <Box ml={6}>tDB Token</Box>
+              <Box ml={ml}>tDB Token</Box>
             </Link>
-            <Box ml={6}>Web Console</Box>
+            <Box ml={ml}>Web Console</Box>
           </Flex>
         </Flex>
         <Box w="100%" sx={{ borderBottom: "1px #9C89F6 solid" }} my={6} />

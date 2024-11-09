@@ -30,26 +30,33 @@ export default function Header({}) {
           sx={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
         >
           <Box w={["100%", null, null, ""]} flex={1}>
-            <Flex align="center">
-              <Box fontSize={["20px", "30px", "45px"]}>
+            <Flex align="center" justify={["center", null, null, "flex-start"]}>
+              <Box fontSize={["20px", "30px", "36px"]}>
                 <Box fontWeight="bold">Zero Knowledge Provable</Box>
                 <Box fontWeight="bold">NoSQL Database</Box>
               </Box>
             </Flex>
             <Box
-              mt={4}
+              mt={[2, null, null, 4]}
               w="100%"
               maxW="1150px"
-              fontSize={["18px", "20px", "22px", "24px"]}
+              fontSize={["12px", "14px", "18px", "20px"]}
               sx={{
                 fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
               }}
             >
-              <Box>
-                <Box>Hyper Extending Blockchains with zkJSON.</Box>
-                <Box mt={1}>Web3 with Web2 UX is Finally Here.</Box>
-              </Box>
-              <Flex mt={6} mb={5} wrap="wrap">
+              <Flex justify={["center", null, null, "flex-start"]}>
+                <Box>
+                  <Box>Hyper Extending Blockchains with zkJSON.</Box>
+                  <Box mt={1}>Web3 with Web2 UX is Finally Here.</Box>
+                </Box>
+              </Flex>
+              <Flex
+                mt={6}
+                mb={5}
+                wrap="wrap"
+                justify={["center", null, null, "flex-start"]}
+              >
                 <Link href="https://x.com/Mardeni01" target="_blank">
                   <Flex
                     color="white"

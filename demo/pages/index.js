@@ -295,7 +295,7 @@ export default function Home({ _date = null }) {
     ? [
         {
           val: "disclosure",
-          name: "Selective Disclosure",
+          name: "Disclosure",
         },
         { val: "gt", name: "$gt" },
         { val: "gte", name: "$gte" },
@@ -330,15 +330,16 @@ export default function Home({ _date = null }) {
           {map(v => {
             return (
               <Flex
+                fontSize={["11px", "12px", "14px", "16px"]}
                 key={v.key}
                 sx={{
                   borderRadius: "5px 5px 0 0",
-                  cursor: "pointer",
-                  ":hover": { opacity: 0.75 },
+                  cursor: v.key === tab ? "default" : "pointer",
+                  ":hover": { opacity: v.key === tab ? 1 : 0.75 },
                 }}
                 justify="center"
+                flex={1}
                 py={3}
-                w="130px"
                 bg={v.key === tab ? "#5137C5" : "white"}
                 color={v.key === tab ? "#eee" : "#5137C5"}
                 fontWeight="bold"
@@ -353,14 +354,23 @@ export default function Home({ _date = null }) {
           })(tabs)}
         </Flex>
       </Flex>
-      <Flex py="50px" justify="center" bg="#5137C5" color="#9C89F6">
+      <Flex
+        py={["30px", "40px", "50px"]}
+        justify="center"
+        bg="#5137C5"
+        color="#9C89F6"
+      >
         {tab === "about" ? (
           <About {...{ setTab }} />
         ) : tab === "create" ? (
-          <Box w="100%" maxW="1150px" px={[10]}>
+          <Box w="100%" maxW="1150px" px={[4, 6, 10]}>
             <Flex wrap="wrap">
-              <Box w={["100%", null, null, "50%"]} pr={4}>
-                <Flex mb={4} align="center">
+              <Box w={["100%", null, null, "50%"]} pr={[0, null, null, 4]}>
+                <Box
+                  display={["block", null, "flex"]}
+                  mb={4}
+                  alignItems="center"
+                >
                   <Flex
                     px={4}
                     py={1}
@@ -371,66 +381,89 @@ export default function Home({ _date = null }) {
                     Node Info
                   </Flex>
                   <Box flex={1} />
-                </Flex>
+                </Box>
                 <Box
                   mb={6}
                   w="100%"
                   sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
                   p={4}
-                  fontSize="14px"
+                  fontSize={["12px", "14px"]}
                 >
                   <Flex align="center">
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
-                      gRPC URL
+                      gRPC
                     </Flex>
-                    <Box px={4}>https://test.wdb.ae</Box>
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
+                    >
+                      https://test.wdb.ae
+                    </Box>
                   </Flex>
                   <Flex align="center" mt={2}>
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       Bundler
                     </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/entity/${stats?.bundler}`}
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
                     >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      <Link
+                        target="_blank"
+                        href={`https://ao.link/#/entity/${stats?.bundler}`}
+                      >
                         {stats?.bundler}
-                      </Box>
-                    </Link>
+                      </Link>
+                    </Box>
                   </Flex>
                   <Flex align="center" mt={2}>
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       Subledger
                     </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
                     >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      <Link
+                        target="_blank"
+                        href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
+                      >
                         {process.env.NEXT_PUBLIC_ADMIN_CONTRACT}
-                      </Box>
-                    </Link>
+                      </Link>
+                    </Box>
                   </Flex>
                 </Box>
                 <Box>
                   <Flex
-                    fontSize="14px"
-                    px={4}
+                    fontSize={["12px", "14px"]}
+                    px={[2, 4]}
                     bg="white"
                     sx={{
                       borderRadius: "5px 5px 0 0",
@@ -441,7 +474,7 @@ export default function Home({ _date = null }) {
                       DB Name
                     </Box>
                     <Box p={2} flex={1}>
-                      AO Process TxId
+                      AO TxId
                     </Box>
                     <Box p={2} flex={1}>
                       DB Admin
@@ -450,8 +483,9 @@ export default function Home({ _date = null }) {
                   {map(v => {
                     return (
                       <Flex
+                        fontSize={["12px", "14px"]}
                         key={v.id}
-                        px={4}
+                        px={[2, 4]}
                         sx={{
                           borderBottom: "1px solid #9C89F6",
                         }}
@@ -511,29 +545,34 @@ export default function Home({ _date = null }) {
               </Box>
               <Box
                 w={["100%", null, null, "50%"]}
-                pl={4}
+                pl={[0, null, null, 4]}
                 mt={[10, null, null, 0]}
               >
-                <Flex mb={4} align="center">
+                <Box
+                  display={["block", null, "flex"]}
+                  mb={4}
+                  alignItems="center"
+                >
                   <Flex
                     px={6}
                     py={1}
                     bg="#9C89F6"
                     color="white"
                     sx={{ borderRadius: "50px" }}
+                    mb={[4, null, 0]}
                   >
-                    Deposit tDB Token
+                    Deposit tDB
                   </Flex>
                   <Box flex={1} />
-                  <Flex>
-                    Your Balance:
+                  <Flex px={[4, null, 0]}>
+                    Balance:
                     <Box mx={2}>{balance / 1000000000000} tDB</Box>
                   </Flex>
-                  <Flex ml={4}>
+                  <Flex ml={[0, null, 4]} px={[4, null, 0]}>
                     Deposit:
                     <Box mx={2}>{deposit / 1000000000000} tDB</Box>
                   </Flex>
-                </Flex>
+                </Box>
                 {!addr ? (
                   <Box mt={6} px={4}>
                     Connect wallet.
@@ -545,7 +584,7 @@ export default function Home({ _date = null }) {
                     p={4}
                     bg="white"
                   >
-                    <Flex>
+                    <Box display={["block", "flex"]}>
                       <Box mr={4}>
                         <Box mb={1}>Operation</Box>
                         <Select
@@ -557,7 +596,7 @@ export default function Home({ _date = null }) {
                           <option value="Withdraw">Withdraw</option>
                         </Select>
                       </Box>
-                      <Box mr={4}>
+                      <Box mr={4} mt={[4, 0]}>
                         <Box mb={1}>Amount (tDB)</Box>
                         <Input
                           value={amount}
@@ -572,7 +611,11 @@ export default function Home({ _date = null }) {
                         />
                       </Box>
                       <Box flex={1} />
-                      <Flex align="flex-end">
+                      <Box
+                        alignItems="flex-end"
+                        mt={[4, 0]}
+                        display={["block", "flex"]}
+                      >
                         <Flex
                           h="40px"
                           justify="center"
@@ -650,30 +693,36 @@ export default function Home({ _date = null }) {
                             op
                           )}
                         </Flex>
-                      </Flex>
-                    </Flex>
+                      </Box>
+                    </Box>
                   </Box>
                 )}
-                <Flex mt={6} mb={4} align="center">
+                <Box
+                  display={["block", null, "flex"]}
+                  mb={4}
+                  mt={10}
+                  alignItems="center"
+                >
                   <Flex
                     px={6}
                     py={1}
                     bg="#9C89F6"
                     color="white"
                     sx={{ borderRadius: "50px" }}
+                    mb={[4, null, 0]}
                   >
-                    Create DB Instance
+                    Create DB
                   </Flex>
                   <Box flex={1} />
-                  <Flex>
-                    Your Deposit:
+                  <Flex px={[4, null, 0]}>
+                    Deposit:
                     <Box mx={2}>{deposit / 1000000000000} tDB</Box>
                   </Flex>
-                  <Flex ml={4}>
+                  <Flex ml={[0, null, 4]} px={[4, null, 0]}>
                     Cost:
                     <Box mx={2}>100 tDB</Box>
                   </Flex>
-                </Flex>
+                </Box>
                 {!addr ? (
                   <Box mt={6} px={4}>
                     Connect wallet.
@@ -685,14 +734,14 @@ export default function Home({ _date = null }) {
                     p={4}
                     bg="white"
                   >
-                    <Flex>
+                    <Box display={["block", "flex"]}>
                       <Box mr={4}>
                         <Box mb={1}>Select Node</Box>
                         <Select w="150px">
                           <option>test.wdb.ae</option>
                         </Select>
                       </Box>
-                      <Box mr={4}>
+                      <Box mr={4} mt={[4, 0]}>
                         <Box mb={1}>New DB Name</Box>
                         <Input
                           value={dbname}
@@ -700,7 +749,11 @@ export default function Home({ _date = null }) {
                         />
                       </Box>
                       <Box flex={1} />
-                      <Flex align="flex-end">
+                      <Box
+                        alignItems="flex-end"
+                        mt={[4, 0]}
+                        display={["block", "flex"]}
+                      >
                         <Flex
                           h="40px"
                           justify="center"
@@ -823,8 +876,8 @@ export default function Home({ _date = null }) {
                             "Deploy"
                           )}
                         </Flex>
-                      </Flex>
-                    </Flex>
+                      </Box>
+                    </Box>
                     <Flex
                       fontSize="12px"
                       mt={4}
@@ -851,9 +904,10 @@ export default function Home({ _date = null }) {
                     )}
                   </Box>
                 )}
-                <Flex justify="flex-end" align="center" mb={6}>
-                  {latency4 ? (
-                    <>
+
+                {latency4 ? (
+                  <>
+                    <Flex justify="flex-end" align="center" mb={6}>
                       <Link
                         target="_blank"
                         href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${latency4.dbname}`}
@@ -908,17 +962,21 @@ export default function Home({ _date = null }) {
                           {latency4.duration} ms
                         </Box>
                       </Flex>
-                    </>
-                  ) : null}
-                </Flex>
+                    </Flex>
+                  </>
+                ) : null}
               </Box>
             </Flex>
           </Box>
         ) : tab === "query" || tab === "zkjson" ? (
-          <Box w="100%" maxW="1150px" px={10}>
+          <Box w="100%" maxW="1150px" px={[4, 6, 10]}>
             <Flex wrap="wrap">
-              <Box w={["100%", null, null, "50%"]} pr={4}>
-                <Flex mb={4} align="center">
+              <Box w={["100%", null, null, "50%"]} pr={[0, null, null, 4]}>
+                <Box
+                  display={["block", null, "flex"]}
+                  mb={4}
+                  alignItems="center"
+                >
                   <Flex
                     px={4}
                     py={1}
@@ -929,7 +987,7 @@ export default function Home({ _date = null }) {
                     Database
                   </Flex>
                   <Box flex={1} />
-                </Flex>
+                </Box>
                 <Box
                   mb={6}
                   sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
@@ -997,65 +1055,81 @@ export default function Home({ _date = null }) {
                   w="100%"
                   sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
                   p={4}
-                  fontSize="14px"
+                  fontSize={["12px", "14px"]}
                 >
                   <Flex align="center">
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       DB Name
                     </Flex>
-                    <Link
-                      target="_blank"
-                      href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${dbname2}`}
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
                     >
-                      <Box px={4}>{dbname2}</Box>
-                    </Link>
+                      <Link
+                        target="_blank"
+                        href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${dbname2}`}
+                      >
+                        {dbname2}
+                      </Link>
+                    </Box>
                   </Flex>
                   <Flex align="center" mt={2}>
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       AO Process
                     </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/entity/${dbmap[dbname2]?.data?.contractTxId}`}
+                    <Box
+                      flex={1}
+                      sx={{
+                        ":hover": { opacity: 0.75 },
+                        wordBreak: "break-all",
+                      }}
+                      px={4}
                     >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      <Link
+                        target="_blank"
+                        href={`https://ao.link/#/entity/${dbmap[dbname2]?.data?.contractTxId}`}
+                      >
                         {dbmap[dbname2]?.data?.contractTxId}
-                      </Box>
-                    </Link>
+                      </Link>
+                    </Box>
                   </Flex>
                   <Flex align="center" mt={2}>
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       Owner
                     </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
-                    >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                    <Box flex={1} sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      <Link
+                        target="_blank"
+                        href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
+                      >
                         {dbmap[dbname2]?.data?.admin}
-                      </Box>
-                    </Link>
+                      </Link>
+                    </Box>
                   </Flex>
                   <Flex align="center" mt={2}>
                     <Flex
                       justify="center"
                       bg="white"
-                      w="100px"
+                      w={["80px", "100px"]}
                       sx={{ borderRadius: "5px" }}
                     >
                       Collections
@@ -1065,16 +1139,19 @@ export default function Home({ _date = null }) {
                     </Box>
                   </Flex>
                 </Box>
-                <Flex mb={2} align="center">
-                  {dbname2} <Box as="i" className="fas fa-angle-right" mx={2} />
-                  {!selectedCol ? (
-                    <Box>-</Box>
-                  ) : (
-                    <Box>
-                      {selectedCol} [ {profiles.length} items ]
-                    </Box>
-                  )}
-                </Flex>
+                <Box flex={1} sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                  <Flex mb={2} align="center">
+                    {dbname2}{" "}
+                    <Box as="i" className="fas fa-angle-right" mx={2} />
+                    {!selectedCol ? (
+                      <Box>-</Box>
+                    ) : (
+                      <Box>
+                        {selectedCol} [ {profiles.length} items ]
+                      </Box>
+                    )}
+                  </Flex>
+                </Box>
                 <Box>
                   <Flex
                     fontSize="14px"
@@ -1131,12 +1208,16 @@ export default function Home({ _date = null }) {
               </Box>
               <Box
                 w={["100%", null, null, "50%"]}
-                pl={4}
+                pl={[0, null, null, 4]}
                 mt={[10, null, null, 0]}
               >
                 {tab === "query" ? (
                   <>
-                    <Flex mb={4}>
+                    <Box
+                      display={["block", null, "flex"]}
+                      mb={4}
+                      alignItems="center"
+                    >
                       <Flex
                         px={6}
                         py={1}
@@ -1146,7 +1227,7 @@ export default function Home({ _date = null }) {
                       >
                         Add Collection
                       </Flex>
-                    </Flex>
+                    </Box>
                     {!addr ? (
                       <Box mt={6} px={4}>
                         Connect wallet.
@@ -1161,7 +1242,7 @@ export default function Home({ _date = null }) {
                         p={4}
                         bg="white"
                       >
-                        <Flex>
+                        <Box display={["block", "flex"]}>
                           <Box mr={4} flex={1}>
                             <Box mb={1}>New Collection Name</Box>
                             <Input
@@ -1169,19 +1250,23 @@ export default function Home({ _date = null }) {
                               onChange={e => setColName(e.target.value)}
                             />
                           </Box>
-                          <Box mr={4} flex={1}>
+                          <Box mr={4} mt={[4, 0]} flex={1}>
                             <Box mb={1}>Data Schema</Box>
                             <Select>
                               <option>Simple Profile</option>
                             </Select>
                           </Box>
-                          <Flex align="flex-end">
+                          <Box
+                            alignItems="flex-end"
+                            mt={[4, 0]}
+                            display={["block", "flex"]}
+                          >
                             <Flex
                               bg={add_ok ? "#5137C5" : "#999"}
                               color="white"
                               py={2}
                               px={3}
-                              w="70px"
+                              w={["100%", "70px"]}
                               justify="center"
                               sx={{
                                 borderRadius: "5px",
@@ -1274,8 +1359,8 @@ export default function Home({ _date = null }) {
                             >
                               Add
                             </Flex>
-                          </Flex>
-                        </Flex>
+                          </Box>
+                        </Box>
                         <Flex
                           fontSize="12px"
                           mt={4}
@@ -1348,8 +1433,11 @@ export default function Home({ _date = null }) {
                         </>
                       ) : null}
                     </Flex>
-
-                    <Flex mb={4}>
+                    <Box
+                      display={["block", null, "flex"]}
+                      mb={4}
+                      alignItems="center"
+                    >
                       <Flex
                         px={6}
                         py={1}
@@ -1359,7 +1447,7 @@ export default function Home({ _date = null }) {
                       >
                         Store Data on WeaveDB
                       </Flex>
-                    </Flex>
+                    </Box>
                     {!addr ? (
                       <Box mt={6} px={4}>
                         Connect wallet.
@@ -1374,20 +1462,21 @@ export default function Home({ _date = null }) {
                         p={4}
                         bg="white"
                       >
-                        <Flex>
-                          <Box>
-                            <Flex>
-                              <Box mr={4}>
+                        <Box display={["block", "flex"]} w="100%">
+                          <Box w="100%">
+                            <Box display={["block", "flex"]}>
+                              <Box mr={4} flex={1}>
                                 <Box mb={1}>Name</Box>
                                 <Input
+                                  w="100%"
                                   value={name}
                                   onChange={e => setName(e.target.value)}
                                 />
                               </Box>
-                              <Box mr={4}>
+                              <Box mr={4} mt={[4, 0]} flex={1}>
                                 <Box mb={1}>Age</Box>
                                 <Select
-                                  w="100px"
+                                  w="100%"
                                   value={age}
                                   onChange={e => setAge(e.target.value)}
                                 >
@@ -1398,10 +1487,10 @@ export default function Home({ _date = null }) {
                                   ))}
                                 </Select>
                               </Box>
-                              <Box>
-                                <Box mb={1}>Married</Box>
+                              <Box mr={4} mt={[4, 0]} flex={1}>
+                                <Box>Married</Box>
                                 <Select
-                                  w="100px"
+                                  w="100%"
                                   value={married}
                                   onChange={e => setMarried(e.target.value)}
                                 >
@@ -1412,14 +1501,15 @@ export default function Home({ _date = null }) {
                                   ))}
                                 </Select>
                               </Box>
-                            </Flex>
+                            </Box>
                             <Box mt={4}>
                               <Box mb={1}>Favorites</Box>
-                              <Flex>
+                              <Flex wrap="wrap">
                                 {map(v => {
                                   return (
                                     <Flex
                                       key={v}
+                                      mx={2}
                                       flex={1}
                                       align="center"
                                       sx={{
@@ -1456,7 +1546,7 @@ export default function Home({ _date = null }) {
                               </Flex>
                             </Box>
                           </Box>
-                        </Flex>
+                        </Box>
                         <Flex
                           fontSize="12px"
                           mt={4}
@@ -1593,7 +1683,12 @@ export default function Home({ _date = null }) {
                         </>
                       ) : null}
                     </Flex>
-                    <Flex mt={6} mb={4}>
+                    <Box
+                      display={["block", null, "flex"]}
+                      mb={4}
+                      mt={6}
+                      alignItems="center"
+                    >
                       <Flex
                         px={6}
                         py={1}
@@ -1603,7 +1698,7 @@ export default function Home({ _date = null }) {
                       >
                         Query Data
                       </Flex>
-                    </Flex>
+                    </Box>
                     <Box
                       my={4}
                       sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
@@ -1627,11 +1722,12 @@ export default function Home({ _date = null }) {
                             />
                           </Box>
                         ) : (
-                          <Box mr={4}>
-                            <Flex>
-                              <Box flex={1} mr={4}>
-                                <Box>Sort</Box>
+                          <Box mr={[0, 4]} w="100%">
+                            <Box display={["block", "flex"]} w="100%">
+                              <Box flex={1} mr={[0, 4]}>
+                                <Box mb={1}>Sort</Box>
                                 <Select
+                                  w="100%"
                                   value={sort}
                                   onChange={e => {
                                     setSort(e.target.value)
@@ -1647,8 +1743,8 @@ export default function Home({ _date = null }) {
                                   ])}
                                 </Select>
                               </Box>
-                              <Box flex={1} mr={4}>
-                                <Box>Order</Box>
+                              <Box mr={[0, 4]} mt={[4, 0]} flex={1}>
+                                <Box mb={1}>Order</Box>
                                 <Select
                                   value={order}
                                   onChange={e => setOrder(e.target.value)}
@@ -1659,8 +1755,8 @@ export default function Home({ _date = null }) {
                                   ])}
                                 </Select>
                               </Box>
-                              <Box flex={1}>
-                                <Box>Limit</Box>
+                              <Box mt={[4, 0]} flex={1}>
+                                <Box mb={1}>Limit</Box>
                                 <Input
                                   value={limit}
                                   onChange={e => {
@@ -1674,10 +1770,12 @@ export default function Home({ _date = null }) {
                                   }}
                                 />
                               </Box>
-                            </Flex>
-                            <Flex>
-                              <Box flex={1} mr={4}>
-                                <Box mt={4}>Where</Box>
+                            </Box>
+                            <Box display={["block", "flex"]}>
+                              <Box flex={1} mr={[0, 4]}>
+                                <Box mb={1} mt={4}>
+                                  Where
+                                </Box>
                                 <Select
                                   disabled={true}
                                   value={sort}
@@ -1691,8 +1789,10 @@ export default function Home({ _date = null }) {
                                   ])}
                                 </Select>
                               </Box>
-                              <Box flex={1} mr={4}>
-                                <Box mt={4}>Operator</Box>
+                              <Box flex={1} mr={[0, 4]}>
+                                <Box mt={4} mb={1}>
+                                  Operator
+                                </Box>
                                 <Select
                                   value={operator}
                                   onChange={e => setOperator(e.target.value)}
@@ -1718,7 +1818,7 @@ export default function Home({ _date = null }) {
                                 </Select>
                               </Box>
                               <Box flex={1}>
-                                <Box mt={4}>
+                                <Box mt={[0, 4]} mb={1}>
                                   Value
                                   {includes(operator, [
                                     "in",
@@ -1736,7 +1836,7 @@ export default function Home({ _date = null }) {
                                   }}
                                 />
                               </Box>
-                            </Flex>
+                            </Box>
                           </Box>
                         )}
                       </Flex>
@@ -1939,14 +2039,6 @@ export default function Home({ _date = null }) {
                     <Flex justify="flex-end" align="center" mb={6}>
                       {latency2 ? (
                         <>
-                          <Box
-                            as="a"
-                            target="_blank"
-                            href={`https://ao.link/#/entity/${latency2.txid}`}
-                            sx={{ textDecoration: "underline" }}
-                          >
-                            AO Process
-                          </Box>
                           <Box flex={1} />
                           <Flex>
                             Queried on {which} in{" "}
@@ -1966,26 +2058,31 @@ export default function Home({ _date = null }) {
                   </>
                 ) : (
                   <>
-                    <Flex mb={4}>
+                    <Box
+                      display={["block", null, "flex"]}
+                      mb={4}
+                      alignItems="center"
+                    >
                       <Flex
                         px={6}
                         py={1}
                         bg="#9C89F6"
                         color="white"
                         sx={{ borderRadius: "50px" }}
+                        mb={[4, null, 0]}
                       >
                         Generate ZKP
                       </Flex>
                       <Box flex={1} />
-                      <Flex>
-                        Your Deposit:
+                      <Flex px={[4, null, 0]}>
+                        Deposit:
                         <Box mx={2}>{deposit / 1000000000000} tDB</Box>
                       </Flex>
-                      <Flex ml={4}>
+                      <Flex ml={[0, null, 4]} px={[4, null, 0]}>
                         Cost:
                         <Box mx={2}>0 tDB</Box>
                       </Flex>
-                    </Flex>
+                    </Box>
                     {!addr ? (
                       <Box mt={6} px={4}>
                         Connect wallet.
@@ -2004,11 +2101,11 @@ export default function Home({ _date = null }) {
                           p={4}
                           bg="white"
                         >
-                          <Flex>
-                            <Box>
+                          <Box display={["block", "flex"]} w="100%">
+                            <Box flex={1}>
                               <Box mb={1}>Field</Box>
                               <Select
-                                w="120px"
+                                w="100%"
                                 value={tar}
                                 onChange={e => {
                                   setTar(e.target.value)
@@ -2049,10 +2146,10 @@ export default function Home({ _date = null }) {
                                 <option value="favorites">favorites</option>
                               </Select>
                             </Box>
-                            <Box ml={4}>
+                            <Box ml={[0, 4]} mt={[4, 0]} flex={1}>
                               <Box mb={1}>Query Type</Box>
                               <Select
-                                w="200px"
+                                w="100%"
                                 value={qtype}
                                 onChange={e => setQType(e.target.value)}
                               >
@@ -2061,7 +2158,7 @@ export default function Home({ _date = null }) {
                                 ))(ops)}
                               </Select>
                             </Box>
-                            <Box flex={1} ml={4}>
+                            <Box ml={[0, 4]} mt={[4, 0]} flex={1}>
                               <Box mb={1}>
                                 Value
                                 {includes(qtype, [
@@ -2079,7 +2176,7 @@ export default function Home({ _date = null }) {
                                 onChange={e => setQValue(e.target.value)}
                               />
                             </Box>
-                          </Flex>
+                          </Box>
                           <Flex
                             mt={4}
                             bg={zkp_ok ? "#5137C5" : "#999"}
@@ -2223,13 +2320,12 @@ export default function Home({ _date = null }) {
                               </Flex>
                               <Flex
                                 px={4}
-                                mr={4}
                                 fontSize="12px"
                                 h="40px"
-                                w="100%"
                                 align="center"
                                 flex={1}
                                 sx={{
+                                  overflow: "hidden",
                                   borderRadius: "5px",
                                   border: "1px solid #9C89F6",
                                 }}
@@ -2263,6 +2359,7 @@ export default function Home({ _date = null }) {
                                 align="center"
                                 flex={1}
                                 sx={{
+                                  overflow: "hidden",
                                   borderRadius: "5px",
                                   border: "1px solid #9C89F6",
                                 }}
@@ -2296,6 +2393,7 @@ export default function Home({ _date = null }) {
                                 align="center"
                                 flex={1}
                                 sx={{
+                                  overflow: "hidden",
                                   wordBreak: "break-all",
                                   borderRadius: "5px",
                                   border: "1px solid #9C89F6",
@@ -2347,7 +2445,7 @@ export default function Home({ _date = null }) {
                                   ":hover": { opacity: 0.75 },
                                 }}
                               >
-                                Copy the ZKP to Etherscan ({" "}
+                                Etherscan ({" "}
                                 {!isNil(zkp.qvalue)
                                   ? "qCond"
                                   : zkp.tar === "name"
@@ -2375,7 +2473,13 @@ export default function Home({ _date = null }) {
                         </Flex>
                       </>
                     )}
-                    <Flex mt={6} mb={4}>
+
+                    <Box
+                      display={["block", null, "flex"]}
+                      mb={4}
+                      mt={4}
+                      alignItems="center"
+                    >
                       <Flex
                         px={6}
                         py={1}
@@ -2385,7 +2489,7 @@ export default function Home({ _date = null }) {
                       >
                         Query from Ethereum with ZKP
                       </Flex>
-                    </Flex>
+                    </Box>
                     {!zkp ? (
                       <Box mt={6} px={4}>
                         Generate a ZKP.
@@ -2400,71 +2504,81 @@ export default function Home({ _date = null }) {
                           p={4}
                           bg="white"
                         >
-                          <Flex align="center" mb={2} fontSize="12px">
-                            <Box
-                              mr={2}
-                              px={2}
-                              bg="#9C89F6"
-                              color="white"
-                              sx={{ borderRadius: "3px" }}
-                            >
-                              DB
-                            </Box>
-                            {zkp.db}
-                            <Box
-                              mr={2}
-                              ml={4}
-                              px={2}
-                              bg="#9C89F6"
-                              color="white"
-                              sx={{ borderRadius: "3px" }}
-                            >
-                              Collection
-                            </Box>
-                            {zkp.col}
-                            <Box
-                              mr={2}
-                              ml={4}
-                              px={2}
-                              bg="#9C89F6"
-                              color="white"
-                              sx={{ borderRadius: "3px" }}
-                            >
-                              Doc
-                            </Box>
-                            {zkp.data.name}
-                            <Box
-                              mr={2}
-                              ml={4}
-                              px={2}
-                              bg="#9C89F6"
-                              color="white"
-                              sx={{ borderRadius: "3px" }}
-                            >
-                              Field
-                            </Box>
-                            {zkp.tar}
-                          </Flex>
-                          <Flex align="center" mb={4} fontSize="12px">
-                            <Box
-                              mr={2}
-                              px={2}
-                              bg="#9C89F6"
-                              color="white"
-                              sx={{ borderRadius: "3px" }}
-                            >
-                              Query Type
-                            </Box>
-                            {zkp.qtype === "disclosure"
-                              ? "Selective Disclosure"
-                              : "$" + zkp.qtype}{" "}
-                            {isNil(zkp.qvalue) ? null : (
-                              <>
-                                {is(Array, zkp.qvalue)
-                                  ? zkp.qvalue.join(", ")
-                                  : zkp.qvalue}
-                              </>
-                            )}
+                          <Flex
+                            align="center"
+                            fontSize="12px"
+                            wrap="wrap"
+                            mb={2}
+                          >
+                            <Flex align="center" mb={2} mr={4}>
+                              <Box
+                                mr={2}
+                                px={2}
+                                bg="#9C89F6"
+                                color="white"
+                                sx={{ borderRadius: "3px" }}
+                              >
+                                DB
+                              </Box>
+                              {zkp.db}
+                            </Flex>
+                            <Flex align="center" mb={2} mr={4}>
+                              <Box
+                                mr={2}
+                                px={2}
+                                bg="#9C89F6"
+                                color="white"
+                                sx={{ borderRadius: "3px" }}
+                              >
+                                Collection
+                              </Box>
+                              {zkp.col}
+                            </Flex>
+                            <Flex align="center" mb={2} mr={4}>
+                              <Box
+                                mr={2}
+                                px={2}
+                                bg="#9C89F6"
+                                color="white"
+                                sx={{ borderRadius: "3px" }}
+                              >
+                                Doc
+                              </Box>
+                              {zkp.data.name}
+                            </Flex>
+                            <Flex align="center" mb={2} mr={4}>
+                              <Box
+                                mr={2}
+                                px={2}
+                                bg="#9C89F6"
+                                color="white"
+                                sx={{ borderRadius: "3px" }}
+                              >
+                                Field
+                              </Box>
+                              {zkp.tar}
+                            </Flex>
+                            <Flex align="center" mb={2} fontSize="12px">
+                              <Box
+                                mr={2}
+                                px={2}
+                                bg="#9C89F6"
+                                color="white"
+                                sx={{ borderRadius: "3px" }}
+                              >
+                                Query Type
+                              </Box>
+                              {zkp.qtype === "disclosure"
+                                ? "Selective Disclosure"
+                                : "$" + zkp.qtype}{" "}
+                              {isNil(zkp.qvalue) ? null : (
+                                <>
+                                  {is(Array, zkp.qvalue)
+                                    ? zkp.qvalue.join(", ")
+                                    : zkp.qvalue}
+                                </>
+                              )}
+                            </Flex>
                           </Flex>
                           <Box>
                             <Flex>
@@ -2632,7 +2746,7 @@ export default function Home({ _date = null }) {
                             </Box>
                           )}
                         </Box>
-                        <Flex justify="flex-end" align="center" mb={6} mt={4}>
+                        <Flex justify="flex-end" align="center" mt={4}>
                           <>
                             {committing[zkp?.db] ? (
                               <Flex align="center">
@@ -2691,79 +2805,101 @@ export default function Home({ _date = null }) {
             </Flex>
           </Box>
         ) : (
-          <Box w="100%" maxW="1150px">
-            {map(v => {
-              return map(v2 => {
-                return (
-                  <Box p={4} key={v.title}>
-                    <Box
-                      onClick={() => alert("Coming Soon!")}
-                      p={4}
-                      color="#9C89F6"
-                      sx={{
-                        cursor: "pointer",
-                        ":hover": { opacity: 0.75 },
-                        borderRadius: "5px",
-                        border: "#9C89F6 1px solid",
-                      }}
-                    >
-                      <Box fontWeight="bold" fontSize="20px">
-                        <Box mr={4} as="i" className="fas fa-plus" />
-                        {v2.title}
+          <Box w="100%" maxW="1150px" px={[4, 6, 10]}>
+            <Flex wrap="wrap">
+              <Box w={["100%", null, null, "50%"]} pr={[0, null, null, 4]}>
+                {map(v => {
+                  return map(v2 => {
+                    return (
+                      <Box px={[0, 4]} py={[2, 4]} key={v.title}>
+                        <Box
+                          onClick={() => alert("Coming Soon!")}
+                          p={4}
+                          color="#9C89F6"
+                          sx={{
+                            cursor: "pointer",
+                            ":hover": { opacity: 0.75 },
+                            borderRadius: "5px",
+                            border: "#9C89F6 1px solid",
+                          }}
+                        >
+                          <Box
+                            fontWeight="bold"
+                            fontSize={["16px", "18px", "20px"]}
+                          >
+                            <Box mr={4} as="i" className="fas fa-plus" />
+                            {v2.title}
+                          </Box>
+                        </Box>
                       </Box>
-                    </Box>
-                  </Box>
-                )
-              })(v)
-            })([
-              [
-                {
-                  title: "Decentralized Social Apps",
-                },
-                {
-                  title: "zkOracles",
-                },
-                {
-                  title: "Token / Data Bridges",
-                },
-              ],
-              [
-                {
-                  title: "zkNFT",
-                },
-                {
-                  title: "DeSci",
-                },
-                {
-                  title: "Blockchain History",
-                },
-              ],
-              [
-                {
-                  title: "Private Databases",
-                },
-                {
-                  title: "Decentalized Point Systems",
-                },
-                {
-                  title: "AI Autonomous Databases",
-                },
-              ],
-            ])}
+                    )
+                  })(v)
+                })([
+                  [
+                    {
+                      title: "Decentralized Social Apps",
+                    },
+                    {
+                      title: "zkOracles",
+                    },
+                    {
+                      title: "Token / Data Bridges",
+                    },
+                  ],
+                  [
+                    {
+                      title: "zkNFT",
+                    },
+                    {
+                      title: "DeSci",
+                    },
+                    {
+                      title: "Blockchain History",
+                    },
+                  ],
+                  [
+                    {
+                      title: "Private Databases",
+                    },
+                    {
+                      title: "Decentalized Point Systems",
+                    },
+                    {
+                      title: "AI Autonomous Databases",
+                    },
+                  ],
+                ])}
+              </Box>
+            </Flex>
           </Box>
         )}
       </Flex>
       {tab === "about" ? (
         <>
           <Flex justify="center">
-            <Box w="100%" maxW="1150px" py={20} px={[4, 6, 8]}>
-              <Box fontWeight="bold" fontSize="20px" color="#9C89F6">
+            <Box w="100%" maxW="1150px" py={[8, 12, 16, 20]} px={[4, 6, 8]}>
+              <Box
+                fontWeight="bold"
+                fontSize={["12px", "14px", "16px", "20px"]}
+                color="#9C89F6"
+              >
                 Backers
               </Box>
-              <Box mb={4} fontWeight="bold" fontSize="35px" color="#3C3C43">
+              <Box
+                mb={4}
+                fontWeight="bold"
+                fontSize={["16px", "20px", "30px", "35px"]}
+                color="#3C3C43"
+              >
                 {`Supported Worldwide by Industry's Best`}
               </Box>
-              <Flex align="center" wrap="wrap" justify="center">
+              <Box
+                alignCenter="center"
+                flexWrap="wrap"
+                justifyContent="center"
+                display={["block", "flex"]}
+                mt={8}
+              >
                 {map(v => {
                   return v.name ? (
                     <Link target="_blank" href={v.href ?? "/"}>
@@ -2771,10 +2907,10 @@ export default function Home({ _date = null }) {
                         key={v.url}
                         sx={{ ":hover": { opacity: 0.75 } }}
                         mx={4}
-                        my={2}
-                        direction="column"
-                        justify="center"
-                        align="center"
+                        my={4}
+                        flexDirection="column"
+                        justifyContent="center"
+                        alignItems="center"
                       >
                         <Box align="center" fontWeight="bold" fontSize="26px">
                           {v.name}
@@ -2790,15 +2926,17 @@ export default function Home({ _date = null }) {
                     </Link>
                   ) : (
                     <Link target="_blank" href={v.href ?? "/"}>
-                      <Image
-                        key={v.url}
-                        src={v.img}
-                        height={v.height ?? "50px"}
-                        mx={4}
-                        my={2}
-                        py={v.py ?? 0}
-                        sx={{ ":hover": { opacity: 0.75 } }}
-                      />
+                      <Flex justify="center">
+                        <Image
+                          key={v.url}
+                          src={v.img}
+                          height={v.height ?? "50px"}
+                          mx={4}
+                          my={4}
+                          py={v.py ?? 0}
+                          sx={{ ":hover": { opacity: 0.75 } }}
+                        />
+                      </Flex>
                     </Link>
                   )
                 })([
@@ -2838,15 +2976,24 @@ export default function Home({ _date = null }) {
                   },
                   { img: "hub71.svg", py: 2, href: "https://hub71.com" },
                 ])}
-              </Flex>
+              </Box>
             </Box>
           </Flex>
           <Flex justify="center" bg="#9C89F6">
             <Box w="100%" maxW="1150px" py={20} px={[4, 6, 8]}>
-              <Box fontWeight="bold" fontSize="20px" color="#ddd">
+              <Box
+                fontWeight="bold"
+                color="#ddd"
+                fontSize={["12px", "14px", "16px", "20px"]}
+              >
                 Ecosystem
               </Box>
-              <Box color="#5137C5" mb={4} fontWeight="bold" fontSize="35px">
+              <Box
+                color="#5137C5"
+                mb={4}
+                fontWeight="bold"
+                fontSize={["16px", "20px", "30px", "35px"]}
+              >
                 {`Who's Building on WeaveDB & zkJSON`}
               </Box>
             </Box>

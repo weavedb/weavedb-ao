@@ -36,10 +36,11 @@ export default function Header({
         <Flex
           h="40px"
           justify="center"
-          w="150px"
+          w={["120px", null, null, "150px"]}
           align="center"
           bg={"#5137C5"}
           color="white"
+          fontSize={["14px", null, null, "16px"]}
           py={1}
           px={3}
           sx={{
