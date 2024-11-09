@@ -67,11 +67,29 @@ export default function Header({}) {
                       ":hover": { opacity: 0.75 },
                     }}
                     fontSize={["14px", "16px", "18px"]}
-                    w={["80px", "100px", "130px"]}
+                    w={["70px", "100px"]}
                     justify="center"
                     p={2}
                   >
                     CEO
+                  </Flex>
+                </Link>
+                <Link href="https://x.com/0xTomo" target="_blank">
+                  <Flex
+                    ml={4}
+                    color="white"
+                    sx={{
+                      bg: "#9C89F6",
+                      borderRadius: "30px",
+                      cursor: "pointer",
+                      ":hover": { opacity: 0.75 },
+                    }}
+                    fontSize={["14px", "16px", "18px"]}
+                    w={["70px", "100px"]}
+                    justify="center"
+                    p={2}
+                  >
+                    Tech
                   </Flex>
                 </Link>
                 <Link
@@ -88,7 +106,7 @@ export default function Header({}) {
                       ":hover": { opacity: 0.75 },
                     }}
                     fontSize={["14px", "16px", "18px"]}
-                    w={["80px", "100px", "130px"]}
+                    w={["70px", "100px"]}
                     justify="center"
                     p={2}
                   >
@@ -106,7 +124,7 @@ export default function Header({}) {
                       ":hover": { opacity: 0.75 },
                     }}
                     fontSize={["14px", "16px", "18px"]}
-                    w={["80px", "100px", "130px"]}
+                    w={["70px", "100px"]}
                     justify="center"
                     p={2}
                   >
