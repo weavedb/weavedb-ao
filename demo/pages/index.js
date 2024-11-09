@@ -1162,9 +1162,8 @@ export default function Home({ _date = null }) {
                     )}
                   </Flex>
                 </Box>
-                <Box>
+                <Box fontSize={["10px", "12px", "14px"]}>
                   <Flex
-                    fontSize={["10px", "12px", "14px"]}
                     px={[2, 4]}
                     bg="white"
                     sx={{
@@ -2905,7 +2904,7 @@ export default function Home({ _date = null }) {
                 {`Supported Worldwide by Industry's Best`}
               </Box>
               <Box
-                alignCenter="center"
+                alignItems="center"
                 flexWrap="wrap"
                 justifyContent="center"
                 display={["block", "flex"]}
