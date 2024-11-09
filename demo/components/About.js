@@ -3,27 +3,31 @@ import { map } from "ramda"
 
 export default function About({ setTab }) {
   return (
-    <Box w="100%" maxW="1150px" py={8} px={[4, 6, 8]}>
-      <Box fontWeight="bold" fontSize="20px" color="#ddd">
+    <Box w="100%" maxW="1150px" py={[0, 4, 8, 12]} px={[4, 6, 8]}>
+      <Box
+        fontWeight="bold"
+        color="#ddd"
+        fontSize={["12px", "14px", "16px", "20px"]}
+      >
         Decentralized NoSQL Database
       </Box>
-      <Box mb={4} fontWeight="bold" fontSize="35px">
+      <Box mb={4} fontWeight="bold" fontSize={["16px", "20px", "30px", "35px"]}>
         Better Developer Experience than Web2
       </Box>
       <Flex w="100%" wrap="wrap">
         {map(v => {
           return map(v2 => {
             return (
-              <Box flex={1} p={4} minW="300px">
+              <Box flex={1} py={4} px={[0, 4]} minW="300px">
                 <Box
                   p={4}
                   color="#9C89F6"
                   sx={{ borderRadius: "5px", border: "#9C89F6 1px solid" }}
                 >
-                  <Box fontWeight="bold" fontSize="20px">
+                  <Box fontWeight="bold" fontSize="18px">
                     {v2.title}
                   </Box>
-                  <Box mt={2} color="#ddd" fontSize="14px">
+                  <Box mt={2} color="#ddd" fontSize="12px">
                     {v2.desc}
                   </Box>
                 </Box>
@@ -75,7 +79,7 @@ export default function About({ setTab }) {
           ],
         ])}
       </Flex>
-      <Flex justify="center" mt={4} fontSize="18px">
+      <Flex justify="center" mt={4} fontSize={["14px", null, null, "16px"]}>
         <Flex
           onClick={() => setTab("create")}
           mx={6}
