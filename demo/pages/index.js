@@ -5,11 +5,13 @@ const { AO } = require("aonote")
 const { toIndex, path, encodeQuery } = require("zkjson")
 import { useEffect, useState } from "react"
 import DB from "weavedb-client"
-import { abi } from "@/lib/utils"
+import { opt, abi } from "@/lib/utils"
 const network = { host: "localhost", port: 4000, protocol: "http" }
 const { Contract, getDefaultProvider } = require("ethers")
 import About from "@/components/About"
 import Footer from "@/components/Footer"
+import Header from "@/components/Header"
+import Masthead from "@/components/Masthead"
 import {
   Image,
   Flex,
@@ -40,17 +42,6 @@ const provider = getDefaultProvider("sepolia", {
   alchemy: process.env.NEXT_PUBLIC_ALCHEMY_KEY,
 })
 const rpc = process.env.NEXT_PUBLIC_RPC
-const opt =
-  process.env.NEXT_PUBLIC_NODE === "localhost"
-    ? {
-        ar: { port: 4000 },
-        aoconnect: {
-          MU_URL: "http://localhost:4002",
-          CU_URL: "http://localhost:4004",
-          GATEWAY_URL: "http://localhost:4000",
-        },
-      }
-    : {}
 
 const getQ = ({
   search,
@@ -193,7 +184,6 @@ const codeDeploy6 = ({ txid, path, zkp, fn }) => {
 }
 
 export default function Home({ _date = null }) {
-  const [connecting, setConnecting] = useState(false)
   const [depositing, setDepositing] = useState(false)
   const toast = useToast()
   const [op, setOp] = useState("Deposit")
@@ -333,250 +323,8 @@ export default function Home({ _date = null }) {
   const dbmap = indexBy(prop("id"))(dbs ?? [])
   return (
     <>
-      <Flex
-        h="60px"
-        sx={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          borderBottom: "1px solid #9c89f6",
-        }}
-        w="100%"
-        align="center"
-        p={4}
-        justify="center"
-        bg="white"
-      >
-        <Flex w="100%" maxW="1360px">
-          <Flex align="center" color="#5137C5" fontWeight="bold">
-            <Image mr={2} src="/logo.svg" boxSize="25px" />
-            WeaveDB Demos
-          </Flex>
-          <Box flex={1} />
-          <Flex
-            h="40px"
-            justify="center"
-            w="150px"
-            align="center"
-            bg={"#5137C5"}
-            color="white"
-            py={1}
-            px={3}
-            sx={{
-              borderRadius: "5px",
-              ":hover": { opacity: 0.75 },
-              cursor: "pointer",
-            }}
-            onClick={async () => {
-              if (!connecting) {
-                let err = null
-                if (addr) {
-                  if (confirm("Disconnect your wallet?")) {
-                    setAddr(null)
-                    toast({
-                      title: "Wallet Disconnected!",
-                      status: "success",
-                      duration: 5000,
-                      isClosable: true,
-                    })
-                  }
-                } else {
-                  setConnecting(true)
-
-                  try {
-                    await arweaveWallet.connect([
-                      "ACCESS_ADDRESS",
-                      "SIGN_TRANSACTION",
-                      "ACCESS_PUBLIC_KEY",
-                    ])
-                    const addr = await arweaveWallet.getActiveAddress()
-                    const ao = new AO(opt)
-                    const { out } = await ao.dry({
-                      pid: process.env.NEXT_PUBLIC_TDB,
-                      act: "Balance",
-                      tags: { Target: addr },
-                      get: "Balance",
-                    })
-                    setBalance(out * 1)
-
-                    const { out: out2 } = await ao.dry({
-                      pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                      act: "Balance",
-                      tags: { Target: addr },
-                      get: "Balance",
-                    })
-                    setDeposit(out2 * 1)
-                    setAddr(addr)
-                    toast({
-                      title: "Wallet Connected!",
-                      status: "success",
-                      description: addr,
-                      duration: 5000,
-                      isClosable: true,
-                    })
-                  } catch (e) {
-                    err = e.toString()
-                  }
-                }
-                setConnecting(false)
-                if (err) {
-                  toast({
-                    title: "Something Went Wrong!",
-                    status: "error",
-                    description: err,
-                    duration: 5000,
-                    isClosable: true,
-                  })
-                }
-              }
-            }}
-          >
-            {connecting ? (
-              <Box as="i" className="fas fa-spin fa-circle-notch" />
-            ) : addr ? (
-              addr.slice(0, 10)
-            ) : (
-              "Connect Wallet"
-            )}
-          </Flex>
-        </Flex>
-      </Flex>
-      <Flex
-        align="center"
-        justify="center"
-        mt="60px"
-        color="#3c3c43"
-        fontSize={"30px"}
-      >
-        <Flex
-          align="center"
-          justify="center"
-          h="100%"
-          w="100%"
-          sx={{
-            backgroundPosition: "left",
-            backgroundRepeat: "no-repeat",
-          }}
-          p={8}
-        >
-          <Flex
-            w="100%"
-            maxW="1150px"
-            fontSize="50px"
-            my="50px"
-            sx={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
-          >
-            <Box>
-              <Box fontWeight="bold">Zero Knowledge Provable</Box>
-              <Box fontWeight="bold">NoSQL Database</Box>
-              <Box
-                mt={4}
-                w="100%"
-                maxW="1150px"
-                fontSize="24px"
-                sx={{
-                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-                }}
-              >
-                <Box>
-                  <Box>Hyper Extending Blockchains with zkJSON.</Box>
-                  <Box mt={1}>Web3 with Web2 UX is Finally Here.</Box>
-                </Box>
-                <Flex mt={6} mb={5}>
-                  <Link href="https://x.com/Mardeni01" target="_blank">
-                    <Flex
-                      color="white"
-                      sx={{
-                        bg: "#9C89F6",
-                        borderRadius: "30px",
-                        cursor: "pointer",
-                        ":hover": { opacity: 0.75 },
-                      }}
-                      fontSize="18px"
-                      w="130px"
-                      justify="center"
-                      p={2}
-                    >
-                      CEO
-                    </Flex>
-                  </Link>
-                  <Link href="https://x.com/0xTomo" target="_blank">
-                    <Flex
-                      ml={4}
-                      color="white"
-                      sx={{
-                        bg: "#9C89F6",
-                        borderRadius: "30px",
-                        cursor: "pointer",
-                        ":hover": { opacity: 0.75 },
-                      }}
-                      fontSize="18px"
-                      w="130px"
-                      justify="center"
-                      p={2}
-                    >
-                      Tech Lead
-                    </Flex>
-                  </Link>
-                  <Link
-                    href="https://github.com/weavedb/weavedb-ao"
-                    target="_blank"
-                  >
-                    <Flex
-                      ml={4}
-                      color="white"
-                      sx={{
-                        bg: "#9C89F6",
-                        borderRadius: "30px",
-                        cursor: "pointer",
-                        ":hover": { opacity: 0.75 },
-                      }}
-                      fontSize="18px"
-                      w="130px"
-                      justify="center"
-                      p={2}
-                    >
-                      Github
-                    </Flex>
-                  </Link>
-                  <Link href="https://x.com/weave_db" target="_blank">
-                    <Flex
-                      ml={4}
-                      color="white"
-                      sx={{
-                        bg: "#9C89F6",
-                        borderRadius: "30px",
-                        cursor: "pointer",
-                        ":hover": { opacity: 0.75 },
-                      }}
-                      fontSize="18px"
-                      w="130px"
-                      justify="center"
-                      p={2}
-                    >
-                      X
-                    </Flex>
-                  </Link>
-                </Flex>
-              </Box>
-            </Box>
-            <Flex flex={1} align="center" justify="center">
-              <Flex
-                p={10}
-                align="center"
-                justify="center"
-                sx={{
-                  border: "15px solid #5137C5",
-                  borderRadius: "50%",
-                  ":hover": { opacity: 0.75 },
-                }}
-              >
-                <Image src="/logo.svg" boxSize="200px" pt="30px" />
-              </Flex>
-            </Flex>
-          </Flex>
-        </Flex>
-      </Flex>
+      <Header {...{ addr, toast, setBalance, setDeposit, setAddr }} />
+      <Masthead />
       <Flex justify="center">
         <Flex w="100%" maxW="1150px">
           {map(v => {
@@ -605,13 +353,167 @@ export default function Home({ _date = null }) {
           })(tabs)}
         </Flex>
       </Flex>
-      <Flex justify="center" p={10} bg="#5137C5" color="#9C89F6">
+      <Flex py="50px" justify="center" bg="#5137C5" color="#9C89F6">
         {tab === "about" ? (
           <About {...{ setTab }} />
         ) : tab === "create" ? (
-          <Box w="100%" maxW="1150px">
-            <Flex>
-              <Box flex={1} mr={4}>
+          <Box w="100%" maxW="1150px" px={[10]}>
+            <Flex wrap="wrap">
+              <Box w={["100%", null, null, "50%"]} pr={4}>
+                <Flex mb={4} align="center">
+                  <Flex
+                    px={4}
+                    py={1}
+                    bg="#9C89F6"
+                    color="white"
+                    sx={{ borderRadius: "50px" }}
+                  >
+                    Node Info
+                  </Flex>
+                  <Box flex={1} />
+                </Flex>
+                <Box
+                  mb={6}
+                  w="100%"
+                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                  p={4}
+                  fontSize="14px"
+                >
+                  <Flex align="center">
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      gRPC URL
+                    </Flex>
+                    <Box px={4}>https://test.wdb.ae</Box>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Bundler
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/entity/${stats?.bundler}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {stats?.bundler}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Subledger
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {process.env.NEXT_PUBLIC_ADMIN_CONTRACT}
+                      </Box>
+                    </Link>
+                  </Flex>
+                </Box>
+                <Box>
+                  <Flex
+                    fontSize="14px"
+                    px={4}
+                    bg="white"
+                    sx={{
+                      borderRadius: "5px 5px 0 0",
+                      borderBottom: "1px solid #9C89F6",
+                    }}
+                  >
+                    <Box w="100px" p={2}>
+                      DB Name
+                    </Box>
+                    <Box p={2} flex={1}>
+                      AO Process TxId
+                    </Box>
+                    <Box p={2} flex={1}>
+                      DB Admin
+                    </Box>
+                  </Flex>
+                  {map(v => {
+                    return (
+                      <Flex
+                        key={v.id}
+                        px={4}
+                        sx={{
+                          borderBottom: "1px solid #9C89F6",
+                        }}
+                        align="center"
+                      >
+                        <Box w="100px" p={2}>
+                          <Link
+                            target="_blank"
+                            href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${v.id}`}
+                          >
+                            <Box
+                              sx={{
+                                cursor: "pointer",
+                                ":hover": { opacity: 0.75 },
+                              }}
+                            >
+                              {v.id}
+                            </Box>
+                          </Link>
+                        </Box>
+                        <Box flex={1} p={2} fontSize="12px">
+                          <Link
+                            target="_blank"
+                            href={`https://ao.link/#/entity/${v.data.contractTxId}`}
+                          >
+                            <Box
+                              sx={{
+                                cursor: "pointer",
+                                ":hover": { opacity: 0.75 },
+                              }}
+                            >
+                              {v.data.contractTxId.slice(0, 20)}...
+                            </Box>
+                          </Link>
+                        </Box>
+                        <Box flex={1} p={2} fontSize="12px">
+                          {!v.data.admin ? null : (
+                            <Link
+                              target="_blank"
+                              href={`https://ao.link/#/entity/${v.data.admin}`}
+                            >
+                              <Box
+                                sx={{
+                                  cursor: "pointer",
+                                  ":hover": { opacity: 0.75 },
+                                }}
+                              >
+                                {v.data.admin.slice(0, 20)}...
+                              </Box>
+                            </Link>
+                          )}
+                        </Box>
+                      </Flex>
+                    )
+                  })(reverse(dbs))}
+                </Box>
+              </Box>
+              <Box
+                w={["100%", null, null, "50%"]}
+                pl={4}
+                mt={[10, null, null, 0]}
+              >
                 <Flex mb={4} align="center">
                   <Flex
                     px={6}
@@ -1010,7 +912,12 @@ export default function Home({ _date = null }) {
                   ) : null}
                 </Flex>
               </Box>
-              <Box flex={1} ml={4}>
+            </Flex>
+          </Box>
+        ) : tab === "query" || tab === "zkjson" ? (
+          <Box w="100%" maxW="1150px" px={10}>
+            <Flex wrap="wrap">
+              <Box w={["100%", null, null, "50%"]} pr={4}>
                 <Flex mb={4} align="center">
                   <Flex
                     px={4}
@@ -1019,153 +926,10 @@ export default function Home({ _date = null }) {
                     color="white"
                     sx={{ borderRadius: "50px" }}
                   >
-                    Node Info
+                    Database
                   </Flex>
                   <Box flex={1} />
                 </Flex>
-                <Box
-                  mb={6}
-                  w="100%"
-                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                  p={4}
-                  fontSize="14px"
-                >
-                  <Flex align="center">
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      gRPC URL
-                    </Flex>
-                    <Box px={4}>https://test.wdb.ae</Box>
-                  </Flex>
-                  <Flex align="center" mt={2}>
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      Bundler
-                    </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/entity/${stats?.bundler}`}
-                    >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
-                        {stats?.bundler}
-                      </Box>
-                    </Link>
-                  </Flex>
-                  <Flex align="center" mt={2}>
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      Subledger
-                    </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
-                    >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
-                        {process.env.NEXT_PUBLIC_ADMIN_CONTRACT}
-                      </Box>
-                    </Link>
-                  </Flex>
-                </Box>
-                <Box>
-                  <Flex
-                    fontSize="14px"
-                    px={4}
-                    bg="white"
-                    sx={{
-                      borderRadius: "5px 5px 0 0",
-                      borderBottom: "1px solid #9C89F6",
-                    }}
-                  >
-                    <Box w="100px" p={2}>
-                      DB Name
-                    </Box>
-                    <Box p={2} flex={1}>
-                      AO Process TxId
-                    </Box>
-                    <Box p={2} flex={1}>
-                      DB Admin
-                    </Box>
-                  </Flex>
-                  {map(v => {
-                    return (
-                      <Flex
-                        key={v.id}
-                        px={4}
-                        sx={{
-                          borderBottom: "1px solid #9C89F6",
-                        }}
-                        align="center"
-                      >
-                        <Box w="100px" p={2}>
-                          <Link
-                            target="_blank"
-                            href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${v.id}`}
-                          >
-                            <Box
-                              sx={{
-                                cursor: "pointer",
-                                ":hover": { opacity: 0.75 },
-                              }}
-                            >
-                              {v.id}
-                            </Box>
-                          </Link>
-                        </Box>
-                        <Box flex={1} p={2} fontSize="12px">
-                          <Link
-                            target="_blank"
-                            href={`https://ao.link/#/entity/${v.data.contractTxId}`}
-                          >
-                            <Box
-                              sx={{
-                                cursor: "pointer",
-                                ":hover": { opacity: 0.75 },
-                              }}
-                            >
-                              {v.data.contractTxId.slice(0, 20)}...
-                            </Box>
-                          </Link>
-                        </Box>
-                        <Box flex={1} p={2} fontSize="12px">
-                          {!v.data.admin ? null : (
-                            <Link
-                              target="_blank"
-                              href={`https://ao.link/#/entity/${v.data.admin}`}
-                            >
-                              <Box
-                                sx={{
-                                  cursor: "pointer",
-                                  ":hover": { opacity: 0.75 },
-                                }}
-                              >
-                                {v.data.admin.slice(0, 20)}...
-                              </Box>
-                            </Link>
-                          )}
-                        </Box>
-                      </Flex>
-                    )
-                  })(reverse(dbs))}
-                </Box>
-              </Box>
-            </Flex>
-          </Box>
-        ) : tab === "query" || tab === "zkjson" ? (
-          <Box w="100%" maxW="1150px">
-            <Flex>
-              <Box flex={1} mr={4}>
                 <Box
                   mb={6}
                   sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
@@ -1227,6 +991,149 @@ export default function Home({ _date = null }) {
                     </Box>
                   </Flex>
                 </Box>
+
+                <Box
+                  mb={4}
+                  w="100%"
+                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                  p={4}
+                  fontSize="14px"
+                >
+                  <Flex align="center">
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      DB Name
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${dbname2}`}
+                    >
+                      <Box px={4}>{dbname2}</Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      AO Process
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/entity/${dbmap[dbname2]?.data?.contractTxId}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {dbmap[dbname2]?.data?.contractTxId}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Owner
+                    </Flex>
+                    <Link
+                      target="_blank"
+                      href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
+                    >
+                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                        {dbmap[dbname2]?.data?.admin}
+                      </Box>
+                    </Link>
+                  </Flex>
+                  <Flex align="center" mt={2}>
+                    <Flex
+                      justify="center"
+                      bg="white"
+                      w="100px"
+                      sx={{ borderRadius: "5px" }}
+                    >
+                      Collections
+                    </Flex>
+                    <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
+                      [ {cols.length} ] {cols.join(", ")}
+                    </Box>
+                  </Flex>
+                </Box>
+                <Flex mb={2} align="center">
+                  {dbname2} <Box as="i" className="fas fa-angle-right" mx={2} />
+                  {!selectedCol ? (
+                    <Box>-</Box>
+                  ) : (
+                    <Box>
+                      {selectedCol} [ {profiles.length} items ]
+                    </Box>
+                  )}
+                </Flex>
+                <Box>
+                  <Flex
+                    fontSize="14px"
+                    px={4}
+                    bg="white"
+                    sx={{
+                      borderRadius: "5px 5px 0 0",
+                      borderBottom: "1px solid #9C89F6",
+                    }}
+                  >
+                    <Box w="100px" p={2}>
+                      name
+                    </Box>
+                    <Box w="70px" p={2}>
+                      age
+                    </Box>
+                    <Box w="70px" p={2}>
+                      married
+                    </Box>
+                    <Box flex={1} p={2}>
+                      favorites
+                    </Box>
+                  </Flex>
+                  {map(v => {
+                    return (
+                      <Flex
+                        key={v.name}
+                        px={4}
+                        sx={{
+                          borderBottom: "1px solid #9C89F6",
+                          cursor: "pointer",
+                          ":hover": { opacity: 0.75 },
+                        }}
+                        bg={selectedData?.name === v.name ? "#9C89F6" : ""}
+                        color={selectedData?.name === v.name ? "white" : ""}
+                        onClick={() => setSelectedData(v)}
+                      >
+                        <Box w="100px" p={2}>
+                          {v.name}
+                        </Box>
+                        <Box w="70px" p={2}>
+                          {v.age}
+                        </Box>
+                        <Box w="70px" p={2}>
+                          {v.married ? "true" : "false"}
+                        </Box>
+                        <Box flex={1} p={2}>
+                          {(v.favorites ?? []).join(", ")}
+                        </Box>
+                      </Flex>
+                    )
+                  })(profiles)}
+                </Box>
+              </Box>
+              <Box
+                w={["100%", null, null, "50%"]}
+                pl={4}
+                mt={[10, null, null, 0]}
+              >
                 {tab === "query" ? (
                   <>
                     <Flex mb={4}>
@@ -2781,157 +2688,6 @@ export default function Home({ _date = null }) {
                   </>
                 )}
               </Box>
-
-              <Box flex={1} ml={4}>
-                <Flex mb={4} align="center">
-                  <Flex
-                    px={4}
-                    py={1}
-                    bg="#9C89F6"
-                    color="white"
-                    sx={{ borderRadius: "50px" }}
-                  >
-                    Database Info
-                  </Flex>
-                  <Box flex={1} />
-                </Flex>
-                <Box
-                  mb={4}
-                  w="100%"
-                  sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
-                  p={4}
-                  fontSize="14px"
-                >
-                  <Flex align="center">
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      DB Name
-                    </Flex>
-                    <Link
-                      target="_blank"
-                      href={`${process.env.NEXT_PUBLIC_SCAN}/node/${process.env.NEXT_PUBLIC_NODE}/db/${dbname2}`}
-                    >
-                      <Box px={4}>{dbname2}</Box>
-                    </Link>
-                  </Flex>
-                  <Flex align="center" mt={2}>
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      AO Process
-                    </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/entity/${dbmap[dbname2]?.data?.contractTxId}`}
-                    >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
-                        {dbmap[dbname2]?.data?.contractTxId}
-                      </Box>
-                    </Link>
-                  </Flex>
-                  <Flex align="center" mt={2}>
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      Owner
-                    </Flex>
-                    <Link
-                      target="_blank"
-                      href={`https://ao.link/#/token/${dbmap[dbname2]?.data?.admin}`}
-                    >
-                      <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
-                        {dbmap[dbname2]?.data?.admin}
-                      </Box>
-                    </Link>
-                  </Flex>
-                  <Flex align="center" mt={2}>
-                    <Flex
-                      justify="center"
-                      bg="white"
-                      w="100px"
-                      sx={{ borderRadius: "5px" }}
-                    >
-                      Collections
-                    </Flex>
-                    <Box sx={{ ":hover": { opacity: 0.75 } }} px={4}>
-                      [ {cols.length} ] {cols.join(", ")}
-                    </Box>
-                  </Flex>
-                </Box>
-                <Flex mb={2} align="center">
-                  {dbname2} <Box as="i" className="fas fa-angle-right" mx={2} />
-                  {!selectedCol ? (
-                    <Box>-</Box>
-                  ) : (
-                    <Box>
-                      {selectedCol} [ {profiles.length} items ]
-                    </Box>
-                  )}
-                </Flex>
-                <Box>
-                  <Flex
-                    fontSize="14px"
-                    px={4}
-                    bg="white"
-                    sx={{
-                      borderRadius: "5px 5px 0 0",
-                      borderBottom: "1px solid #9C89F6",
-                    }}
-                  >
-                    <Box w="100px" p={2}>
-                      name
-                    </Box>
-                    <Box w="70px" p={2}>
-                      age
-                    </Box>
-                    <Box w="70px" p={2}>
-                      married
-                    </Box>
-                    <Box flex={1} p={2}>
-                      favorites
-                    </Box>
-                  </Flex>
-                  {map(v => {
-                    return (
-                      <Flex
-                        key={v.name}
-                        px={4}
-                        sx={{
-                          borderBottom: "1px solid #9C89F6",
-                          cursor: "pointer",
-                          ":hover": { opacity: 0.75 },
-                        }}
-                        bg={selectedData?.name === v.name ? "#9C89F6" : ""}
-                        color={selectedData?.name === v.name ? "white" : ""}
-                        onClick={() => setSelectedData(v)}
-                      >
-                        <Box w="100px" p={2}>
-                          {v.name}
-                        </Box>
-                        <Box w="70px" p={2}>
-                          {v.age}
-                        </Box>
-                        <Box w="70px" p={2}>
-                          {v.married ? "true" : "false"}
-                        </Box>
-                        <Box flex={1} p={2}>
-                          {(v.favorites ?? []).join(", ")}
-                        </Box>
-                      </Flex>
-                    )
-                  })(profiles)}
-                </Box>
-              </Box>
             </Flex>
           </Box>
         ) : (
@@ -3000,17 +2756,11 @@ export default function Home({ _date = null }) {
       {tab === "about" ? (
         <>
           <Flex justify="center">
-            <Box w="100%" maxW="1150px" py={20}>
-              <Box fontWeight="bold" fontSize="20px" px={4} color="#9C89F6">
+            <Box w="100%" maxW="1150px" py={20} px={[4, 6, 8]}>
+              <Box fontWeight="bold" fontSize="20px" color="#9C89F6">
                 Backers
               </Box>
-              <Box
-                mb={4}
-                fontWeight="bold"
-                fontSize="35px"
-                px={4}
-                color="#3C3C43"
-              >
+              <Box mb={4} fontWeight="bold" fontSize="35px" color="#3C3C43">
                 {`Supported Worldwide by Industry's Best`}
               </Box>
               <Flex align="center" wrap="wrap" justify="center">
@@ -3091,18 +2841,12 @@ export default function Home({ _date = null }) {
               </Flex>
             </Box>
           </Flex>
-          <Flex h="250px" justify="center" bg="#9C89F6">
-            <Box w="100%" maxW="1150px" py={20}>
-              <Box fontWeight="bold" fontSize="20px" px={4} color="#ddd">
+          <Flex justify="center" bg="#9C89F6">
+            <Box w="100%" maxW="1150px" py={20} px={[4, 6, 8]}>
+              <Box fontWeight="bold" fontSize="20px" color="#ddd">
                 Ecosystem
               </Box>
-              <Box
-                color="#5137C5"
-                mb={4}
-                fontWeight="bold"
-                fontSize="35px"
-                px={4}
-              >
+              <Box color="#5137C5" mb={4} fontWeight="bold" fontSize="35px">
                 {`Who's Building on WeaveDB & zkJSON`}
               </Box>
             </Box>

@@ -3,37 +3,33 @@ import { map } from "ramda"
 
 export default function About({ setTab }) {
   return (
-    <Box w="100%" maxW="1150px" py={16}>
-      <Box fontWeight="bold" fontSize="20px" px={4} color="#ddd">
+    <Box w="100%" maxW="1150px" py={8} px={[4, 6, 8]}>
+      <Box fontWeight="bold" fontSize="20px" color="#ddd">
         Decentralized NoSQL Database
       </Box>
-      <Box mb={4} fontWeight="bold" fontSize="35px" px={4}>
+      <Box mb={4} fontWeight="bold" fontSize="35px">
         Better Developer Experience than Web2
       </Box>
-      <Box w="100%">
+      <Flex w="100%" wrap="wrap">
         {map(v => {
-          return (
-            <Flex w="100%">
-              {map(v2 => {
-                return (
-                  <Box flex={1} p={4}>
-                    <Box
-                      p={4}
-                      color="#9C89F6"
-                      sx={{ borderRadius: "5px", border: "#9C89F6 1px solid" }}
-                    >
-                      <Box fontWeight="bold" fontSize="20px">
-                        {v2.title}
-                      </Box>
-                      <Box mt={2} color="#ddd" fontSize="14px">
-                        {v2.desc}
-                      </Box>
-                    </Box>
+          return map(v2 => {
+            return (
+              <Box flex={1} p={4} minW="300px">
+                <Box
+                  p={4}
+                  color="#9C89F6"
+                  sx={{ borderRadius: "5px", border: "#9C89F6 1px solid" }}
+                >
+                  <Box fontWeight="bold" fontSize="20px">
+                    {v2.title}
                   </Box>
-                )
-              })(v)}
-            </Flex>
-          )
+                  <Box mt={2} color="#ddd" fontSize="14px">
+                    {v2.desc}
+                  </Box>
+                </Box>
+              </Box>
+            )
+          })(v)
         })([
           [
             {
@@ -78,7 +74,7 @@ export default function About({ setTab }) {
             },
           ],
         ])}
-      </Box>
+      </Flex>
       <Flex justify="center" mt={4} fontSize="18px">
         <Flex
           onClick={() => setTab("create")}
