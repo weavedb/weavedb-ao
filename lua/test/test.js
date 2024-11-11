@@ -3,8 +3,41 @@ import { expect } from "chai"
 import { AR, AO } from "aonote"
 import { readFileSync } from "fs"
 import { resolve } from "path"
+import forge from "node-forge"
 
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
+
+async function deriveEntropyForRSA(prfKey) {
+  const hkdfKeyMaterial = await crypto.subtle.importKey(
+    "raw",
+    prfKey,
+    "HKDF",
+    false,
+    ["deriveBits"],
+  )
+
+  const derivedEntropy = await crypto.subtle.deriveBits(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(32),
+      info: new Uint8Array(0),
+    },
+    hkdfKeyMaterial,
+    4096,
+  )
+  return new Uint8Array(derivedEntropy)
+}
+
+function to64(x) {
+  let modulus = Buffer.from(x.toByteArray())
+  if (modulus[0] === 0) modulus = modulus.slice(1)
+  return modulus
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "")
+}
 
 describe("WeaveDB", function () {
   this.timeout(0)
@@ -16,6 +49,39 @@ describe("WeaveDB", function () {
     }))
   })
 
+  it.skip("should generate valid arweave keys with node-forge", async () => {
+    const key = new Uint8Array([])
+    const entropy = await deriveEntropyForRSA(key)
+    const rng = forge.random.createInstance()
+    rng.seedFileSync = () => entropy.toString("hex")
+    const rsaKeyPair = forge.pki.rsa.generateKeyPair({
+      bits: 4096,
+      e: 0x10001,
+      prng: rng,
+    })
+    const { publicKey, privateKey } = rsaKeyPair
+    const { n } = publicKey
+    const { d, p, q, dP, dQ, qInv } = privateKey
+    const jwk = {
+      kty: "RSA",
+      e: "AQAB",
+      n: to64(n),
+      d: to64(d),
+      p: to64(p),
+      q: to64(q),
+      dp: to64(dP),
+      dq: to64(dQ),
+      qi: to64(qInv),
+    }
+    const ao = await new AO(opt.ao).init(jwk)
+    const data = readFileSync(
+      resolve(import.meta.dirname, "../contracts/weavedb.lua"),
+      "utf8",
+    )
+    const { err, pid } = await ao.spwn({})
+    await ao.wait({ pid })
+    ok(await ao.load({ pid, data, fills: { BUNDLER: ar.addr } }))
+  })
   it("should deploy weavedb process", async () => {
     const data = readFileSync(
       resolve(import.meta.dirname, "../contracts/weavedb.lua"),
