@@ -133,17 +133,6 @@ export default function Header({
               if (isWallet) {
                 setIsWallet(false)
               } else if (addr) {
-                /*
-                if (confirm("Disconnect your wallet?")) {
-                  setAddr(null)
-                  setJwk(null)
-                  toast({
-                    title: "Wallet Disconnected!",
-                    status: "success",
-                    duration: 5000,
-                    isClosable: true,
-                  })
-                  }*/
                 setIsWallet(true)
               } else {
                 setConnecting(true)
