@@ -239,6 +239,169 @@ local function _parser(query)
 end
 
 
+
+local function get_table_keys(t)
+  local keys = {}
+  for k in pairs(t) do table.insert(keys, k) end
+  return keys
+end
+
+local function sort_docs(docs, sort_specs)
+  if #sort_specs == 0 then
+    sort_specs = {{"__id__", "asc"}}
+  end
+  table.sort(
+    docs,
+    function(a, b)
+      for _, spec in ipairs(sort_specs) do
+	local field, direction = spec[1], spec[2]
+	local aVal = field == "__id__" and a.__id__ or a[field]
+	local bVal = field == "__id__" and b.__id__ or b[field]
+	
+	if aVal ~= bVal then
+	  if direction == "asc" then
+	    return aVal < bVal
+	  else
+	    return aVal > bVal
+	  end
+	end
+      end
+      return false
+    end
+  )
+  return docs
+end
+
+local function matches_filters(doc, filters)
+  local id = doc.__id__
+  
+  -- Handle equals
+  for _, filter in ipairs(filters.equals or {}) do
+    local field, _, value = table.unpack(filter)
+    if doc[field] ~= value then return false end
+  end
+  
+  -- Handle array operations
+  if filters.array then
+    local field, op, value = table.unpack(filters.array)
+    if op == "array-contains" then
+      if not doc[field] or type(doc[field]) ~= "table" then return false end
+      local found = false
+      for _, v in ipairs(doc[field]) do
+        if v == value then found = true; break end
+      end
+      if not found then return false end
+    elseif op == "array-contains-any" then
+      if not doc[field] or type(doc[field]) ~= "table" then return false end
+      local found = false
+      for _, target in ipairs(value) do
+        for _, v in ipairs(doc[field]) do
+          if v == target then found = true; break end
+        end
+        if found then break end
+      end
+      if not found then return false end
+    end
+  end
+  
+  -- Handle range operations
+  if filters.range then
+    for _, range in ipairs(filters.range) do
+      local field, op, value = table.unpack(range)
+      local doc_val = doc[field]
+      
+      if op == ">" and not (doc_val > value) then return false end
+      if op == ">=" and not (doc_val >= value) then return false end
+      if op == "<" and not (doc_val < value) then return false end
+      if op == "<=" and not (doc_val <= value) then return false end
+      if op == "!=" and doc_val == value then return false end
+      if op == "in" then
+        local found = false
+        for _, v in ipairs(value) do
+          if doc_val == v then found = true; break end
+        end
+        if not found then return false end
+      end
+      if op == "not-in" then
+        for _, v in ipairs(value) do
+          if doc_val == v then return false end
+        end
+      end
+    end
+  end
+  
+  return true
+end
+
+local function apply_cursor(docs, cursor, is_start)
+  if not cursor then return docs end
+
+  local op, value = cursor[1], cursor[2]
+  local comparison = nil
+  
+  if op == "startAt" then
+    comparison = function(doc) return doc >= value end
+  elseif op == "startAfter" then
+    comparison = function(doc) return doc > value end
+  elseif op == "endAt" then
+    comparison = function(doc) return doc <= value end
+  elseif op == "endBefore" then
+    comparison = function(doc) return doc < value end
+  end
+
+  local result = {}
+  for i, doc in ipairs(docs) do
+    if comparison(is_start and doc or value) then
+      table.insert(result, doc)
+    end
+  end
+  
+  return result
+end
+
+
+local function query_data(query)
+  local docs = {}
+  local collection = data[query.path[1]]
+  local docs = {}
+  for id, doc in pairs(collection) do
+    local doc2 = doc
+    doc2.__id__ = id    
+    table.insert(docs, doc2)
+  end
+  
+    -- Apply filters
+  local filtered_docs = {}
+  for _, doc in ipairs(docs) do
+    if matches_filters(doc, query) then
+      table.insert(filtered_docs, doc)
+    end
+  end
+  
+  -- Sort
+  local sorted_docs = sort_docs(filtered_docs, query.sort)
+
+    -- Apply cursors
+  local cursored_docs = apply_cursor(sorted_docs, query.start, true)
+  cursored_docs = apply_cursor(cursored_docs, query.end_, false)
+
+  -- Apply limit
+  if query.limit and #cursored_docs > query.limit then
+    local limited = {}
+    for i = 1, query.limit do
+      table.insert(limited, cursored_docs[i])
+    end
+    cursored_docs = limited
+  end
+  
+  -- Remove injected IDs
+  for _, doc in ipairs(cursored_docs) do
+    doc.__id__ = nil
+  end
+  
+  return cursored_docs
+end
+
 Handlers.add(
   "Set-Bundler",
   "Set-Bundler",
@@ -271,14 +434,11 @@ Handlers.add(
   function(msg)
     assert(type(msg.Tags.Query) == 'string', 'Query is required!')
     local query = json.decode(msg.Tags.Query)
-    --local q = _parser(query)
+    local q = _parser(query)
     local result = nil
-    if #query == 1 then
-      local _result = {}
-      for k, v in pairs(data[query[1]]) do
-	table.insert(_result, v)
-      end
-      result = _result
+    if #q.path == 1 then
+      local __result = query_data(q)
+      result = __result
     else
       result = data[query[1]][query[2]]
     end

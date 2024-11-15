@@ -5,6 +5,7 @@ import { readFileSync } from "fs"
 import { resolve } from "path"
 import forge from "node-forge"
 import { _parser, qs3, qs1, qs2 } from "./parser.js"
+import { reverse, map } from "ramda"
 const rmNull = obj => {
   for (let k in obj) {
     if (obj[k] === null) delete obj[k]
@@ -99,13 +100,17 @@ describe("WeaveDB", function () {
 
     await ao.wait({ pid })
     const { mid } = await ao.load({ pid, data, fills: { BUNDLER: ar.addr } })
-    const bob = { name: "Bob" }
+    const bob = { name: "Bob", age: 5, favs: ["apple", "orange"] }
+    const alice = { name: "Alice", age: 10, favs: ["apple", "grape"] }
+    const mike = { name: "Mike", age: 15, favs: ["lemon", "peach"] }
+    const beth = { name: "Beth", age: 20, favs: ["grape", "peach"] }
+    const ppl = [bob, alice, mike, beth]
     ok(
       await ao.msg({
         pid,
         act: "Rollup",
         data: JSON.stringify({
-          diffs: [{ collection: "ppl", doc: "Bob", data: bob }],
+          diffs: map(v => ({ collection: "ppl", doc: v.name, data: v }))(ppl),
         }),
         checkData: "committed!",
       }),
@@ -122,18 +127,45 @@ describe("WeaveDB", function () {
     }
 
     const res = await q("ppl", "Bob")
+
     expect(res).to.eql(bob)
-    expect(await q("ppl")).to.eql([bob])
+    expect(await q("ppl")).to.eql([alice, beth, bob, mike])
+    expect(await q("ppl", ["age", "desc"])).to.eql([beth, mike, alice, bob])
+    expect(await q("ppl", ["age"], 2)).to.eql([bob, alice])
+    expect(await q("ppl", ["age", "==", 10], 2)).to.eql([alice])
+    expect(await q("ppl", ["age", "desc"], ["age", "in", [10, 20]], 2)).to.eql([
+      beth,
+      alice,
+    ])
+
+    expect(
+      await q("ppl", ["age", "desc"], ["age", "not-in", [10, 20]], 2),
+    ).to.eql([mike, bob])
+
+    expect(await q("ppl", ["age", "desc"], ["age", "!=", 10])).to.eql([
+      beth,
+      mike,
+      bob,
+    ])
+
+    expect(await q("ppl", ["favs", "array-contains", "apple"])).to.eql([
+      alice,
+      bob,
+    ])
+
+    expect(
+      await q(
+        "ppl",
+        ["age", "desc"],
+        ["favs", "array-contains-any", ["grape", "apple"]],
+      ),
+    ).to.eql([beth, alice, bob])
+
+    // test parser
     let i = 0
     for (let v of qs3) {
       const lua = await q2(...v)
       const js = rmNull(_parser(v))
-      if (lua === null) {
-        console.log(`[${i}].............`, v)
-        console.log()
-      }
-      //console.log("lua", JSON.stringify(lua))
-      //console.log("js", JSON.stringify(js))
       expect(lua).to.eql(js)
       i++
     }
