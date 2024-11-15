@@ -470,12 +470,13 @@
     ramda "^0.30.0"
     zod "^3.23.5"
 
-"@permaweb/aoconnect@^0.0.59":
-  version "0.0.59"
-  resolved "https://registry.npmjs.org/@permaweb/aoconnect/-/aoconnect-0.0.59.tgz"
-  integrity sha512-AgnUv50hp3BVvqWk2IOw3p9ksF2GblFwQHCIWqwTYjvdViCPlsL4gx/BefxFqbMABXQ5q2QJItMJLlPelqC2CQ==
+"@permaweb/aoconnect@^0.0.61":
+  version "0.0.61"
+  resolved "https://registry.yarnpkg.com/@permaweb/aoconnect/-/aoconnect-0.0.61.tgz#471afcd99a528b25407567cfdfe582df9e30fc7d"
+  integrity sha512-qFIFG29pL7+SUEgW/jHeA4GCuz89XOh5abrsRS8l3dASk6OX00mqMlDT9zJcuewxu21HeDwTW2bO230rvdzGQQ==
   dependencies:
     "@permaweb/ao-scheduler-utils" "~0.0.23"
+    "@permaweb/protocol-tag-utils" "~0.0.2"
     buffer "^6.0.3"
     debug "^4.3.6"
     hyper-async "^1.1.2"
@@ -483,6 +484,11 @@
     ramda "^0.30.1"
     warp-arbundles "^1.0.4"
     zod "^3.23.8"
+
+"@permaweb/protocol-tag-utils@~0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@permaweb/protocol-tag-utils/-/protocol-tag-utils-0.0.2.tgz#c8a2eddf7da15d70a6e60aecff839730cb59aee3"
+  integrity sha512-2IiKu71W7pkHKIzxabCGQ5q8DSppZaE/sPcPF2hn+OWwfe04M7b5X5LHRXQNPRuxHWuioieGdPQb3F7apOlffQ==
 
 "@randlabs/communication-bridge@1.0.1":
   version "1.0.1"
@@ -561,13 +567,13 @@ anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aonote@^0.8.3:
-  version "0.8.3"
-  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.8.3.tgz#52ce470ac867daf16af7745fdaba5f738abf8f30"
-  integrity sha512-v+jgz8pKn+brD3RrpqMFnxrj8hBRBBSlzrQgoKrjFrm0OF9wZaWaWwvWAS9CxrjL/0m3DXIc3f7Ytq1jJMhXcQ==
+aonote@^0.8.5:
+  version "0.8.5"
+  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.8.5.tgz#9e482ccb07706ae05c346fb7e825c001d57baa8b"
+  integrity sha512-CY0UFBJ0AO2Hl8x38b45YC7gYBLtCoD+rlGH5KC/0JR5ajZIdVc5nlYyGhc97KUi4W+cEyv9mIwU01sPgDje5Q==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
-    "@permaweb/aoconnect" "^0.0.59"
+    "@permaweb/aoconnect" "^0.0.61"
     arbundles "^0.11.1"
     arweave "^1.15.1"
     ramda "^0.30.1"

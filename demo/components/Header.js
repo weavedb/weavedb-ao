@@ -133,17 +133,6 @@ export default function Header({
               if (isWallet) {
                 setIsWallet(false)
               } else if (addr) {
-                /*
-                if (confirm("Disconnect your wallet?")) {
-                  setAddr(null)
-                  setJwk(null)
-                  toast({
-                    title: "Wallet Disconnected!",
-                    status: "success",
-                    duration: 5000,
-                    isClosable: true,
-                  })
-                  }*/
                 setIsWallet(true)
               } else {
                 setConnecting(true)
@@ -340,7 +329,7 @@ export default function Header({
                     tags: { Target: addr },
                     get: "Balance",
                   })
-                  setBalance(out * 1)
+                  setBalance({ amount: out * 1, addr })
                   const { out: out2 } = await ao.dry({
                     pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
                     act: "Balance",

@@ -1,4 +1,5 @@
 import { Link, ssr } from "arnext"
+import { useInterval } from "usehooks-ts"
 import QRCode from "react-qr-code"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import SyntaxHighlighter from "react-syntax-highlighter"
@@ -192,6 +193,7 @@ export default function Home({ _date = null }) {
   const [walletTab, setWalletTab] = useState("Tokens")
   const [jwk, setJwk] = useState(null)
   const [depositing, setDepositing] = useState(false)
+  const [sending, setSending] = useState(false)
   const toast = useToast()
   const [isWallet, setIsWallet] = useState(false)
   const [isSend, setIsSend] = useState(false)
@@ -246,9 +248,10 @@ export default function Home({ _date = null }) {
   const [qvalue, setQValue] = useState("")
   const [selectedCol, setSelectedCol] = useState(null)
   const [addr, setAddr] = useState(null)
-  const [balance, setBalance] = useState(0)
+  const [balance, setBalance] = useState(null)
   const [deposit, setDeposit] = useState(0)
   const [stats, setStats] = useState(null)
+  const [count, setCount] = useState(0)
   const _path = isNil(zkp)
     ? null
     : [Number(zkp.col_id).toString(), toIndex(zkp.data.name), ...path(zkp.tar)]
@@ -288,11 +291,33 @@ export default function Home({ _date = null }) {
       }
     })()
   }, [])
+  useInterval(async () => {
+    if (addr) {
+      const ao = new AO(opt)
+      const { err, out } = await ao.dry({
+        pid: process.env.NEXT_PUBLIC_TDB,
+        act: "Balance",
+        tags: { Target: addr },
+        get: "Balance",
+      })
+      if (balance && balance.addr === addr && balance.amount < out * 1) {
+        toast({
+          title: `Received ${Math.floor((out * 1 - balance.amount) / 10 ** 12)} tDB Token!`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        })
+      }
+      if (out) setBalance({ addr, amount: out * 1 })
+    }
+  }, 5000)
+
   const processId = isNil(zkp)
     ? ""
     : (indexBy(prop("id"), dbs)[zkp.db]?.data?.contractTxId ?? "")
   const deploy_ok = !/^\s*$/.test(dbname) && deposit * 1 >= 100 * 10 ** 12
-  let deposit_ok = amount * 1 > 0 && balance * 1 >= amount * 10 ** 12
+  let deposit_ok =
+    amount * 1 > 0 && balance && balance.amount * 1 >= amount * 10 ** 12
   if (op === "Withdraw") {
     deposit_ok = amount * 1 > 0 && deposit * 1 >= amount * 10 ** 12
   }
@@ -302,6 +327,10 @@ export default function Home({ _date = null }) {
   const zkp_ok =
     !isNil(selectedData) && (qtype === "disclosure" || !/^\s*$/.test(qvalue))
   const eth_ok = !committing[zkp?.db]
+  const to_ok = validAddress(to)
+  const send_amount_ok =
+    sendAmount * 1 > 0 && balance && balance.amount * 1 >= sendAmount * 10 ** 12
+  const send_ok = to_ok && send_amount_ok
   const ops = includes(tar, ["name", "age", "married"])
     ? [
         {
@@ -490,15 +519,24 @@ export default function Home({ _date = null }) {
                           onClick={() => {
                             setIsScan(true)
                             function onScanSuccess(decodedText, decodedResult) {
-                              setTo(decodedText)
-                              html5QrcodeScanner.clear()
-                              setIsScan(false)
-                              toast({
-                                title: `Wallet Address Detected!`,
-                                status: "success",
-                                duration: 3000,
-                                isClosable: true,
-                              })
+                              if (!validAddress(decodedText)) {
+                                toast({
+                                  title: `Not a Valid Arweave Address!`,
+                                  status: "error",
+                                  duration: 3000,
+                                  isClosable: true,
+                                })
+                              } else {
+                                setTo(decodedText)
+                                html5QrcodeScanner.clear()
+                                setIsScan(false)
+                                toast({
+                                  title: `Wallet Address Detected!`,
+                                  status: "success",
+                                  duration: 3000,
+                                  isClosable: true,
+                                })
+                              }
                             }
                             html5QrcodeScanner = new Html5QrcodeScanner(
                               "reader",
@@ -515,9 +553,21 @@ export default function Home({ _date = null }) {
                         fontSize="11px"
                         value={to}
                         onChange={e => setTo(e.target.value)}
+                        color={to_ok ? "#222" : "crimson"}
+                        sx={{
+                          border: to_ok
+                            ? "#E2E8F0 1px solid"
+                            : "crimson 1px solid",
+                        }}
                       />
                       <Flex align="center" mb={1} mt={4} px={2}>
-                        <Box>Balance: {Math.floor(balance / 10 ** 12)} tDB</Box>
+                        <Box>
+                          Balance:{" "}
+                          {Math.floor(
+                            (balance ? balance.amount : 0) / 10 ** 12,
+                          )}{" "}
+                          tDB
+                        </Box>
                         <Box flex={1} />
                         <Box
                           sx={{
@@ -527,13 +577,23 @@ export default function Home({ _date = null }) {
                           }}
                           color="#5137C5"
                           onClick={() =>
-                            setSendAmount(Math.floor(balance / 10 ** 12))
+                            setSendAmount(
+                              Math.floor(
+                                (balance ? balance.amount : 0) / 10 ** 12,
+                              ),
+                            )
                           }
                         >
                           Max
                         </Box>
                       </Flex>
                       <Input
+                        color={send_amount_ok ? "#222" : "crimson"}
+                        sx={{
+                          border: send_amount_ok
+                            ? "#E2E8F0 1px solid"
+                            : "crimson 1px solid",
+                        }}
                         value={sendAmount}
                         onChange={e => {
                           if (
@@ -547,71 +607,87 @@ export default function Home({ _date = null }) {
                       <Flex
                         sx={{
                           borderRadius: "5px",
-                          cursor: "pointer",
+                          cursor: send_ok ? "pointer" : "default",
                           ":hover": { opacity: 0.75 },
                         }}
+                        h="40px"
                         mt={6}
                         justify="center"
                         color="white"
-                        bg="#5137C5"
+                        bg={send_ok ? "#5137C5" : "#999"}
+                        align="center"
                         py={2}
                         onClick={async () => {
-                          let _addr
-                          if (jwk) {
-                            _addr = addr
-                          } else {
-                            await arweaveWallet.connect([
-                              "ACCESS_ADDRESS",
-                              "SIGN_TRANSACTION",
-                              "ACCESS_PUBLIC_KEY",
-                            ])
-                            _addr = await arweaveWallet.getActiveAddress()
-                          }
-
-                          const ao = await new AO(opt).init(
-                            jwk ?? arweaveWallet,
-                          )
-                          const winston = "000000000000"
-                          const { err, res } = await ao.msg({
-                            pid: process.env.NEXT_PUBLIC_TDB,
-                            act: "Transfer",
-                            tags: {
-                              Recipient: to,
-                              Quantity: `${sendAmount}${winston}`,
-                            },
-                          })
-                          console.log(err)
-                          if (err) {
-                            toast({
-                              title: `Something Went Wrong!`,
-                              status: "error",
-                              description: JSON.stringify(err),
-                              duration: 5000,
-                              isClosable: true,
-                            })
-                          } else {
-                            toast({
-                              title: `Token Sent!`,
-                              status: "success",
-                              description: `${sendAmount} tDB`,
-                              duration: 5000,
-                              isClosable: true,
-                            })
-                            setSendAmount("0")
-                            setIsSend(false)
+                          if (send_ok && !sending) {
+                            let err
                             try {
-                              const { out } = await ao.dry({
+                              setSending(true)
+                              let _addr
+                              if (jwk) {
+                                _addr = addr
+                              } else {
+                                await arweaveWallet.connect([
+                                  "ACCESS_ADDRESS",
+                                  "SIGN_TRANSACTION",
+                                  "ACCESS_PUBLIC_KEY",
+                                ])
+                                _addr = await arweaveWallet.getActiveAddress()
+                              }
+
+                              const ao = await new AO(opt).init(
+                                jwk ?? arweaveWallet,
+                              )
+                              const winston = "000000000000"
+                              const { err: _err, res } = await ao.msg({
                                 pid: process.env.NEXT_PUBLIC_TDB,
-                                act: "Balance",
-                                tags: { Target: _addr },
-                                get: "Balance",
+                                act: "Transfer",
+                                tags: {
+                                  Recipient: to,
+                                  Quantity: `${sendAmount}${winston}`,
+                                },
                               })
-                              setBalance(out * 1)
-                            } catch (e) {}
+                              if (_err) {
+                                err = _err.toString()
+                              } else {
+                                toast({
+                                  title: `${sendAmount} tDB Token Sent!`,
+                                  status: "success",
+                                  duration: 5000,
+                                  isClosable: true,
+                                })
+                                setSendAmount("0")
+                                setIsSend(false)
+                                try {
+                                  const { out } = await ao.dry({
+                                    pid: process.env.NEXT_PUBLIC_TDB,
+                                    act: "Balance",
+                                    tags: { Target: _addr },
+                                    get: "Balance",
+                                  })
+                                  setBalance({ amount: out * 1, addr: _addr })
+                                } catch (e) {}
+                              }
+                            } catch (e) {
+                              err = e.toString()
+                            }
+                            setSending(false)
+                            if (err) {
+                              toast({
+                                title: `Something Went Wrong!`,
+                                status: "error",
+                                description: err,
+                                duration: 5000,
+                                isClosable: true,
+                              })
+                            }
                           }
                         }}
                       >
-                        Send
+                        {sending ? (
+                          <Box as="i" className="fas fa-spin fa-circle-notch" />
+                        ) : (
+                          "Send"
+                        )}
                       </Flex>
                     </Box>
                   )}
@@ -641,7 +717,8 @@ export default function Home({ _date = null }) {
                   </Flex>
                   <Flex justify="center" align="flex-end" py={6}>
                     <Box fontWeight="bold" fontSize="40px" color="#5137C5">
-                      {Math.floor(balance / 10 ** 12)} tDB
+                      {Math.floor((balance ? balance.amount : 0) / 10 ** 12)}{" "}
+                      tDB
                     </Box>
                   </Flex>
                   <Flex my={4} justify="center" fontSize="12px">
@@ -785,7 +862,10 @@ export default function Home({ _date = null }) {
                         tDB
                       </Box>
                       <Box flex={1} />
-                      {Math.floor(balance / 10 ** 12)} tDB
+                      {Math.floor(
+                        (balance ? balance.amount : 0) / 10 ** 12,
+                      )}{" "}
+                      tDB
                     </Flex>
                   ) : (
                     <Flex p={6} justify="center" color="#666">
@@ -1044,7 +1124,9 @@ export default function Home({ _date = null }) {
                       <Box flex={1} />
                       <Flex px={[4, null, 0]}>
                         Balance:
-                        <Box mx={2}>{balance / 1000000000000} tDB</Box>
+                        <Box mx={2}>
+                          {(balance ? balance.amount : 0) / 1000000000000} tDB
+                        </Box>
                       </Flex>
                       <Flex ml={[0, null, 4]} px={[4, null, 0]}>
                         Deposit:
@@ -1160,7 +1242,7 @@ export default function Home({ _date = null }) {
                                       tags: { Target: _addr },
                                       get: "Balance",
                                     })
-                                    setBalance(out * 1)
+                                    setBalance({ amount: out * 1, addr: _addr })
 
                                     const { out: out2 } = await ao.dry({
                                       pid: process.env
