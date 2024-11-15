@@ -1,4 +1,5 @@
 import { Link, ssr } from "arnext"
+import { useInterval } from "usehooks-ts"
 import QRCode from "react-qr-code"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import SyntaxHighlighter from "react-syntax-highlighter"
@@ -247,9 +248,10 @@ export default function Home({ _date = null }) {
   const [qvalue, setQValue] = useState("")
   const [selectedCol, setSelectedCol] = useState(null)
   const [addr, setAddr] = useState(null)
-  const [balance, setBalance] = useState(0)
+  const [balance, setBalance] = useState(null)
   const [deposit, setDeposit] = useState(0)
   const [stats, setStats] = useState(null)
+  const [count, setCount] = useState(0)
   const _path = isNil(zkp)
     ? null
     : [Number(zkp.col_id).toString(), toIndex(zkp.data.name), ...path(zkp.tar)]
@@ -289,11 +291,33 @@ export default function Home({ _date = null }) {
       }
     })()
   }, [])
+  useInterval(async () => {
+    if (addr) {
+      const ao = new AO(opt)
+      const { err, out } = await ao.dry({
+        pid: process.env.NEXT_PUBLIC_TDB,
+        act: "Balance",
+        tags: { Target: addr },
+        get: "Balance",
+      })
+      if (balance && balance.addr === addr && balance.amount < out * 1) {
+        toast({
+          title: `Received ${Math.floor((out * 1 - balance.amount) / 10 ** 12)} tDB Token!`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        })
+      }
+      if (out) setBalance({ addr, amount: out * 1 })
+    }
+  }, 5000)
+
   const processId = isNil(zkp)
     ? ""
     : (indexBy(prop("id"), dbs)[zkp.db]?.data?.contractTxId ?? "")
   const deploy_ok = !/^\s*$/.test(dbname) && deposit * 1 >= 100 * 10 ** 12
-  let deposit_ok = amount * 1 > 0 && balance * 1 >= amount * 10 ** 12
+  let deposit_ok =
+    amount * 1 > 0 && balance && balance.amount * 1 >= amount * 10 ** 12
   if (op === "Withdraw") {
     deposit_ok = amount * 1 > 0 && deposit * 1 >= amount * 10 ** 12
   }
@@ -305,7 +329,7 @@ export default function Home({ _date = null }) {
   const eth_ok = !committing[zkp?.db]
   const to_ok = validAddress(to)
   const send_amount_ok =
-    sendAmount * 1 > 0 && balance * 1 >= sendAmount * 10 ** 12
+    sendAmount * 1 > 0 && balance && balance.amount * 1 >= sendAmount * 10 ** 12
   const send_ok = to_ok && send_amount_ok
   const ops = includes(tar, ["name", "age", "married"])
     ? [
@@ -537,7 +561,13 @@ export default function Home({ _date = null }) {
                         }}
                       />
                       <Flex align="center" mb={1} mt={4} px={2}>
-                        <Box>Balance: {Math.floor(balance / 10 ** 12)} tDB</Box>
+                        <Box>
+                          Balance:{" "}
+                          {Math.floor(
+                            (balance ? balance.amount : 0) / 10 ** 12,
+                          )}{" "}
+                          tDB
+                        </Box>
                         <Box flex={1} />
                         <Box
                           sx={{
@@ -547,7 +577,11 @@ export default function Home({ _date = null }) {
                           }}
                           color="#5137C5"
                           onClick={() =>
-                            setSendAmount(Math.floor(balance / 10 ** 12))
+                            setSendAmount(
+                              Math.floor(
+                                (balance ? balance.amount : 0) / 10 ** 12,
+                              ),
+                            )
                           }
                         >
                           Max
@@ -616,9 +650,8 @@ export default function Home({ _date = null }) {
                                 err = _err.toString()
                               } else {
                                 toast({
-                                  title: `Token Sent!`,
+                                  title: `${sendAmount} tDB Token Sent!`,
                                   status: "success",
-                                  description: `${sendAmount} tDB`,
                                   duration: 5000,
                                   isClosable: true,
                                 })
@@ -631,7 +664,7 @@ export default function Home({ _date = null }) {
                                     tags: { Target: _addr },
                                     get: "Balance",
                                   })
-                                  setBalance(out * 1)
+                                  setBalance({ amount: out * 1, addr: _addr })
                                 } catch (e) {}
                               }
                             } catch (e) {
@@ -684,7 +717,8 @@ export default function Home({ _date = null }) {
                   </Flex>
                   <Flex justify="center" align="flex-end" py={6}>
                     <Box fontWeight="bold" fontSize="40px" color="#5137C5">
-                      {Math.floor(balance / 10 ** 12)} tDB
+                      {Math.floor((balance ? balance.amount : 0) / 10 ** 12)}{" "}
+                      tDB
                     </Box>
                   </Flex>
                   <Flex my={4} justify="center" fontSize="12px">
@@ -828,7 +862,10 @@ export default function Home({ _date = null }) {
                         tDB
                       </Box>
                       <Box flex={1} />
-                      {Math.floor(balance / 10 ** 12)} tDB
+                      {Math.floor(
+                        (balance ? balance.amount : 0) / 10 ** 12,
+                      )}{" "}
+                      tDB
                     </Flex>
                   ) : (
                     <Flex p={6} justify="center" color="#666">
@@ -1087,7 +1124,9 @@ export default function Home({ _date = null }) {
                       <Box flex={1} />
                       <Flex px={[4, null, 0]}>
                         Balance:
-                        <Box mx={2}>{balance / 1000000000000} tDB</Box>
+                        <Box mx={2}>
+                          {(balance ? balance.amount : 0) / 1000000000000} tDB
+                        </Box>
                       </Flex>
                       <Flex ml={[0, null, 4]} px={[4, null, 0]}>
                         Deposit:
@@ -1203,7 +1242,7 @@ export default function Home({ _date = null }) {
                                       tags: { Target: _addr },
                                       get: "Balance",
                                     })
-                                    setBalance(out * 1)
+                                    setBalance({ amount: out * 1, addr: _addr })
 
                                     const { out: out2 } = await ao.dry({
                                       pid: process.env

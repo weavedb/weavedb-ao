@@ -329,7 +329,7 @@ export default function Header({
                     tags: { Target: addr },
                     get: "Balance",
                   })
-                  setBalance(out * 1)
+                  setBalance({ amount: out * 1, addr })
                   const { out: out2 } = await ao.dry({
                     pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
                     act: "Balance",

@@ -4,6 +4,13 @@ import { AR, AO } from "aonote"
 import { readFileSync } from "fs"
 import { resolve } from "path"
 import forge from "node-forge"
+import { _parser, qs3, qs1, qs2 } from "./parser.js"
+const rmNull = obj => {
+  for (let k in obj) {
+    if (obj[k] === null) delete obj[k]
+  }
+  return obj
+}
 
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
 
@@ -82,12 +89,13 @@ describe("WeaveDB", function () {
     await ao.wait({ pid })
     ok(await ao.load({ pid, data, fills: { BUNDLER: ar.addr } }))
   })
-  it("should deploy weavedb process", async () => {
+
+  it.only("should deploy weavedb process", async () => {
     const data = readFileSync(
       resolve(import.meta.dirname, "../contracts/weavedb.lua"),
       "utf8",
     )
-    const { err, pid } = await ao.spwn({})
+    const { err, pid } = await ao.spwn({ module: opt.modules.aos2 })
 
     await ao.wait({ pid })
     const { mid } = await ao.load({ pid, data, fills: { BUNDLER: ar.addr } })
@@ -103,13 +111,54 @@ describe("WeaveDB", function () {
       }),
     )
     const q = async (...query) => {
-      const get = { name: "Result", json: true }
+      const get = { data: true, json: true }
       const tags = { Query: JSON.stringify(query) }
-      return JSON.parse((await ao.dry({ pid, act: "Get", tags, get })).out)
+      return (await ao.dry({ pid, act: "Get", tags, get })).out
     }
+    const q2 = async (...query) => {
+      const get = { data: true, json: true }
+      const tags = { Query: JSON.stringify(query) }
+      return (await ao.dry({ pid, act: "Parse", tags, get })).out
+    }
+
     const res = await q("ppl", "Bob")
     expect(res).to.eql(bob)
     expect(await q("ppl")).to.eql([bob])
+    let i = 0
+    for (let v of qs3) {
+      const lua = await q2(...v)
+      const js = rmNull(_parser(v))
+      if (lua === null) {
+        console.log(`[${i}].............`, v)
+        console.log()
+      }
+      //console.log("lua", JSON.stringify(lua))
+      //console.log("js", JSON.stringify(js))
+      expect(lua).to.eql(js)
+      i++
+    }
+    /*
+    const data2 = readFileSync(
+      resolve(import.meta.dirname, "../contracts/app.lua"),
+      "utf8",
+    )
+    const { pid: pid2 } = ok(await ao.spwn({ module: opt.modules.aos2 }))
+    ok(await ao.wait({ pid: pid2 }))
+    ok(
+      await ao.load({
+        pid: pid2,
+        data: data2,
+        fills: { BUNDLER: ar.addr },
+      }),
+    )
+    const { res: res2, out } = await ao.msg({
+      pid: pid2,
+      act: "Fetch",
+      tags: { DB: pid },
+      get: { data: true, json: true },
+    })
+    console.log(out)
+    */
   })
 
   it("should deploy tDB token and subledgers", async () => {
