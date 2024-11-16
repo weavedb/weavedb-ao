@@ -110,11 +110,48 @@ describe("WeaveDB", function () {
         pid,
         act: "Rollup",
         data: JSON.stringify({
-          diffs: map(v => ({ collection: "ppl", doc: v.name, data: v }))(ppl),
+          diffs: map(v => ({
+            collection: "ppl",
+            doc: v.name,
+            op: "set",
+            data: v,
+          }))(ppl),
         }),
         checkData: "committed!",
       }),
     )
+    ok(
+      await ao.msg({
+        pid,
+        act: "Rollup",
+        data: JSON.stringify({
+          diffs: map(v => ({
+            collection: "ppl",
+            doc: v.name,
+            op: "delete",
+            data: null,
+          }))(ppl),
+        }),
+        checkData: "committed!",
+      }),
+    )
+
+    ok(
+      await ao.msg({
+        pid,
+        act: "Rollup",
+        data: JSON.stringify({
+          diffs: map(v => ({
+            collection: "ppl",
+            doc: v.name,
+            op: "update",
+            data: v,
+          }))(ppl),
+        }),
+        checkData: "committed!",
+      }),
+    )
+
     const q = async (...query) => {
       const get = { data: true, json: true }
       const tags = { Query: JSON.stringify(query) }
