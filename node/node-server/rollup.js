@@ -4,6 +4,9 @@ const { AO } = require("aonote")
 const fs = require("fs")
 const { cpSync, rmSync } = require("fs")
 const {
+  uniq,
+  concat,
+  equals,
   o,
   sortBy,
   mergeLeft,
@@ -268,13 +271,18 @@ class Rollup {
                   }
                 })(bundles)
                 const data = {
-                  diffs,
+                  diffs: map(v => {
+                    v.data = v.diff
+                    delete v.diff
+                    return v
+                  })(diffs),
                   txs,
                   tx_height: last(bundles).id * 1,
                   block_height: ++height,
                   hash,
                   zkdb: _zkp,
                 }
+                console.log(data)
                 const { err, mid } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
@@ -765,11 +773,33 @@ class Rollup {
           let diff = []
           for (const k in tx.result.kvs) {
             if (k.split("///")[1]?.split("/")[0] === "data") {
+              let op = "none"
+              let val = null
+              if (isNil(this.kvs[k]) && !isNil(tx.result.kvs[k])) {
+                op = "set"
+                val = tx.result.kvs[k].val
+              } else if (!isNil(this.kvs[k]) && isNil(tx.result.kvs[k])) {
+                op = "delete"
+                val = null
+              } else if (!equals(this.kvs[k].val, tx.result.kvs[k].val)) {
+                op = "update"
+                const v1 = this.kvs[k].val ?? {}
+                const v2 = tx.result.kvs[k].val ?? {}
+                const keys1 = keys(v1)
+                const keys2 = keys(v2)
+                val = {}
+                const keys3 = o(uniq, concat(keys1))(keys2)
+                for (const v of keys3) {
+                  if (v1[v] !== v2[v]) val[v] = v2[v] ?? null
+                }
+              }
               let sps = k.split("///")
               diff.push({
+                op,
                 collection: sps[0],
                 doc: k.split("///")[1]?.split("/")[1],
-                data: tx.result.kvs[k]?.val ?? null,
+                data: tx.result.kvs[k].val ?? null,
+                diff: val,
               })
             }
             this.kvs[k] = tx.result.kvs[k]

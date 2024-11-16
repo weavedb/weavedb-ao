@@ -421,7 +421,16 @@ Handlers.add(
     local _data = json.decode(msg.Data)
     for i, v in ipairs(_data.diffs) do
       data[v.collection] = data[v.collection] or {}
-      data[v.collection][v.doc] = v.data
+      if v.op == "set" then
+	data[v.collection][v.doc] = v.data
+      elseif v.op == "delete" then
+	data[v.collection][v.doc] = nil
+      elseif v.op == "update" then
+	data[v.collection][v.doc] = data[v.collection][v.doc] or {}
+	for key, val in pairs(v.data) do
+	  data[v.collection][v.doc][key] = val
+	end
+      end
     end
     msg.reply({ Data = 'committed!'})
   end
