@@ -23,7 +23,7 @@ describe("WeaveDB on AO", function () {
     token
 
   before(async () => {
-    ;({ ao, opt } = await setup({ cache: true }))
+    ;({ ao, opt } = await setup({ cache: false }))
     // testing in insecure mode, never do that in production
     // deploy token
     const data = readFileSync(
@@ -63,7 +63,6 @@ describe("WeaveDB on AO", function () {
   })
 
   after(async () => await test.stop())
-
   it("should deploy weavedb on AO", async () => {
     const winston = "000000000000"
     const ar = new AR(opt.ar)
@@ -101,7 +100,6 @@ describe("WeaveDB on AO", function () {
       }),
     )
     await wait(3000)
-
     expect(
       (
         await ao.dry({
@@ -123,7 +121,7 @@ describe("WeaveDB on AO", function () {
     })
     await wait(2000)
     const stats = await db.node({ op: "stats" })
-    expect(stats).to.eql({ dbs: [] })
+    expect(stats).to.eql({ dbs: [], bundler: ao.ar.addr })
 
     // add a DB to node
     const tx = await db.admin(
@@ -141,13 +139,14 @@ describe("WeaveDB on AO", function () {
     )
     expect(tx.success).to.eql(true)
 
+    console.log("aos2...", opt.modules.aos2)
     // deploy L1 AO contract (via node)
     const { contractTxId, srcTxId } = await db.admin(
       {
         op: "deploy_contract",
         key: "testdb",
         type: "ao",
-        module: opt.ao.module,
+        module: opt.modules.aos2,
         scheduler: opt.ao.scheduler,
       },
       { ar2: ar.jwk },
@@ -174,20 +173,17 @@ describe("WeaveDB on AO", function () {
     })
     expect(tx2.success).to.eql(true)
     expect(await db2.get("ppl", "Bob")).to.eql(Bob)
-
     // check rollup
     await wait(5000)
     expect(
-      JSON.parse(
-        (
-          await ao.dry({
-            pid: contractTxId,
-            act: "Get",
-            tags: { Query: JSON.stringify(["ppl", "Bob"]) },
-            get: { name: "Result", json: true },
-          })
-        ).out,
-      ),
+      (
+        await ao.dry({
+          pid: contractTxId,
+          act: "Get",
+          tags: { Query: JSON.stringify(["ppl", "Bob"]) },
+          get: { data: true, json: true },
+        })
+      ).out,
     ).to.eql(Bob)
 
     // check zkp

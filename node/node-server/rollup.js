@@ -222,6 +222,7 @@ class Rollup {
               let results = []
               let validity = {}
               let _hash = this.last_hash
+              // need fix
               for (let v of b) {
                 const { bundles, hash, t } = v
                 _hash = hash

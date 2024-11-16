@@ -418,7 +418,8 @@ class VM {
                     "utf8",
                   )
 
-                  const { pid } = await ao.spwn({})
+                  const { pid } = await ao.spwn({ module, scheduler })
+                  console.log("spawned...", pid)
                   await ao.wait({ pid })
                   const { mid } = await ao.load({
                     pid,
