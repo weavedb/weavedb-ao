@@ -11,6 +11,7 @@ const {
   wallet = "bundler",
   network = "mainnet",
   quantity = "1000",
+  decimal = 12,
 } = yargs(process.argv.slice(2)).argv
 
 const main = async () => {
@@ -32,11 +33,15 @@ const main = async () => {
       },
     }
   }
+  let zero = ""
+  for (let i = 0; i < decimal; i++) {
+    zero += "0"
+  }
   const ao = new AO(opt2)
   const res = await ao.msg({
     pid: token,
     act: "Transfer",
-    tags: { Recipient: to, Quantity: `${quantity}000000000000` },
+    tags: { Recipient: to, Quantity: `${quantity}${zero}` },
   })
   console.log(
     (

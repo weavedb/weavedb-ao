@@ -190,6 +190,7 @@ const codeDeploy6 = ({ txid, path, zkp, fn }) => {
 export default function Home({ _date = null }) {
   const [to, setTo] = useState("")
   const [sendAmount, setSendAmount] = useState("0")
+  const [token, setToken] = useState(process.env.NEXT_PUBLIC_TDB)
   const [walletTab, setWalletTab] = useState("Tokens")
   const [jwk, setJwk] = useState(null)
   const [depositing, setDepositing] = useState(false)
@@ -249,6 +250,7 @@ export default function Home({ _date = null }) {
   const [selectedCol, setSelectedCol] = useState(null)
   const [addr, setAddr] = useState(null)
   const [balance, setBalance] = useState(null)
+  const [balanceETH, setBalanceETH] = useState(null)
   const [deposit, setDeposit] = useState(0)
   const [stats, setStats] = useState(null)
   const [count, setCount] = useState(0)
@@ -309,8 +311,31 @@ export default function Home({ _date = null }) {
         })
       }
       if (out) setBalance({ addr, amount: out * 1 })
+      const { err: err2, out: out2 } = await ao.dry({
+        pid: process.env.NEXT_PUBLIC_ETH,
+        act: "Balance",
+        tags: { Target: addr },
+        get: "Balance",
+      })
+      if (
+        balanceETH &&
+        balanceETH.addr === addr &&
+        balanceETH.amount < out2 * 1
+      ) {
+        toast({
+          title: `Received ${Math.floor((out2 * 1 - balanceETH.amount) / 10 ** 18)} taoETH Token!`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        })
+      }
+      if (out2) setBalanceETH({ addr, amount: out2 * 1 })
     }
   }, 5000)
+  const _token =
+    token === process.env.NEXT_PUBLIC_TDB
+      ? { tick: "tDB", balance, decimal: 12 }
+      : { tick: "taoETH", balance: balanceETH, decimal: 18 }
 
   const processId = isNil(zkp)
     ? ""
@@ -329,7 +354,9 @@ export default function Home({ _date = null }) {
   const eth_ok = !committing[zkp?.db]
   const to_ok = validAddress(to)
   const send_amount_ok =
-    sendAmount * 1 > 0 && balance && balance.amount * 1 >= sendAmount * 10 ** 12
+    sendAmount * 1 > 0 &&
+    _token.balance &&
+    _token.balance.amount * 1 >= sendAmount * 10 ** _token.decimal
   const send_ok = to_ok && send_amount_ok
   const ops = includes(tar, ["name", "age", "married"])
     ? [
@@ -564,9 +591,10 @@ export default function Home({ _date = null }) {
                         <Box>
                           Balance:{" "}
                           {Math.floor(
-                            (balance ? balance.amount : 0) / 10 ** 12,
+                            (_token.balance ? _token.balance.amount : 0) /
+                              10 ** _token.decimal,
                           )}{" "}
-                          tDB
+                          {_token.tick}
                         </Box>
                         <Box flex={1} />
                         <Box
@@ -579,7 +607,8 @@ export default function Home({ _date = null }) {
                           onClick={() =>
                             setSendAmount(
                               Math.floor(
-                                (balance ? balance.amount : 0) / 10 ** 12,
+                                (_token.balance ? _token.balance.amount : 0) /
+                                  10 ** _token.decimal,
                               ),
                             )
                           }
@@ -637,9 +666,12 @@ export default function Home({ _date = null }) {
                               const ao = await new AO(opt).init(
                                 jwk ?? arweaveWallet,
                               )
-                              const winston = "000000000000"
+                              let winston = ""
+                              for (let i = 0; i < _token.decimal; i++) {
+                                winston += "0"
+                              }
                               const { err: _err, res } = await ao.msg({
-                                pid: process.env.NEXT_PUBLIC_TDB,
+                                pid: token,
                                 act: "Transfer",
                                 tags: {
                                   Recipient: to,
@@ -650,7 +682,7 @@ export default function Home({ _date = null }) {
                                 err = _err.toString()
                               } else {
                                 toast({
-                                  title: `${sendAmount} tDB Token Sent!`,
+                                  title: `${sendAmount} ${_token.tick} Token Sent!`,
                                   status: "success",
                                   duration: 5000,
                                   isClosable: true,
@@ -659,12 +691,19 @@ export default function Home({ _date = null }) {
                                 setIsSend(false)
                                 try {
                                   const { out } = await ao.dry({
-                                    pid: process.env.NEXT_PUBLIC_TDB,
+                                    pid: token,
                                     act: "Balance",
                                     tags: { Target: _addr },
                                     get: "Balance",
                                   })
-                                  setBalance({ amount: out * 1, addr: _addr })
+                                  if (_token.tick === "tDB") {
+                                    setBalance({ amount: out * 1, addr: _addr })
+                                  } else {
+                                    setBalanceETH({
+                                      amount: out * 1,
+                                      addr: _addr,
+                                    })
+                                  }
                                 } catch (e) {}
                               }
                             } catch (e) {
@@ -717,8 +756,11 @@ export default function Home({ _date = null }) {
                   </Flex>
                   <Flex justify="center" align="flex-end" py={6}>
                     <Box fontWeight="bold" fontSize="40px" color="#5137C5">
-                      {Math.floor((balance ? balance.amount : 0) / 10 ** 12)}{" "}
-                      tDB
+                      {Math.floor(
+                        (_token.balance ? _token.balance.amount : 0) /
+                          10 ** _token.decimal,
+                      )}{" "}
+                      {_token.tick}
                     </Box>
                   </Flex>
                   <Flex my={4} justify="center" fontSize="12px">
@@ -851,22 +893,53 @@ export default function Home({ _date = null }) {
                     })(["Tokens", "Activity"])}
                   </Flex>
                   {walletTab === "Tokens" ? (
-                    <Flex p={4} bg="#f7f7f7">
-                      <Image src="/logo.svg" boxSize="24px" />
-                      <Box
-                        mx={4}
-                        fontSize="16px"
-                        fontWeight="bold"
-                        color="#666"
-                      >
-                        tDB
-                      </Box>
-                      <Box flex={1} />
-                      {Math.floor(
-                        (balance ? balance.amount : 0) / 10 ** 12,
-                      )}{" "}
-                      tDB
-                    </Flex>
+                    <>
+                      {map(v => {
+                        return (
+                          <Flex
+                            onClick={() => setToken(v.addr)}
+                            p={4}
+                            bg={token === v.addr ? "#f7f7f7" : ""}
+                            sx={{
+                              borderBottom: "1px solid #ddd",
+                              cursor: "pointer",
+                              ":hover": { opacity: 0.75 },
+                            }}
+                          >
+                            <Image src={v.logo} boxSize="24px" />
+                            <Box
+                              mx={4}
+                              fontSize="16px"
+                              fontWeight="bold"
+                              color="#666"
+                            >
+                              {v.tick}
+                            </Box>
+                            <Box flex={1} />
+                            {Math.floor(
+                              (v.balance ? v.balance.amount : 0) /
+                                10 ** v.decimal,
+                            )}{" "}
+                            {v.tick}
+                          </Flex>
+                        )
+                      })([
+                        {
+                          tick: "tDB",
+                          logo: "/logo.svg",
+                          balance,
+                          decimal: 12,
+                          addr: process.env.NEXT_PUBLIC_TDB,
+                        },
+                        {
+                          tick: "taoETH",
+                          logo: "/eth.png",
+                          balance: balanceETH,
+                          decimal: 18,
+                          addr: process.env.NEXT_PUBLIC_ETH,
+                        },
+                      ])}
+                    </>
                   ) : (
                     <Flex p={6} justify="center" color="#666">
                       No Activity Yet

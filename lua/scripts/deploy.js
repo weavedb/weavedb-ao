@@ -5,9 +5,11 @@ import { readFileSync } from "fs"
 import { fileURLToPath } from "node:url"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
-const { wallet = "bundler", network = "mainnet" } = yargs(
-  process.argv.slice(2),
-).argv
+const {
+  token = "tDB",
+  wallet = "bundler",
+  network = "mainnet",
+} = yargs(process.argv.slice(2)).argv
 
 const main = async () => {
   const jwk = JSON.parse(
@@ -30,33 +32,42 @@ const main = async () => {
   }
   const ao = new AO(opt2)
   const data = readFileSync(
-    resolve(__dirname, "../../lua/contracts/tDB.lua"),
+    resolve(__dirname, `../../lua/contracts/${token}.lua`),
     "utf8",
   )
   const { err, pid } = await ao.spwn({})
-  await ao.wait({ pid })
-  const { mid } = await ao.load({ pid, data })
   console.log(pid)
-  await ao.msg({ pid, act: "Mint", tags: { Quantity: "10000000000000000" } })
+  await ao.wait({ pid })
+  console.log("deployed!!")
+  const { mid } = await ao.load({ pid, data })
+  console.log("Now minting token...")
+  await ao.msg({
+    pid,
+    act: "Mint",
+    tags: {
+      Quantity:
+        token === "tDB" ? "10000000000000000" : "10000000000000000000000",
+    },
+  })
   console.log(
     (await ao.dry({ pid, act: "Balances", get: { data: true, json: true } }))
       .out[ao.ar.addr],
   )
+  if (token === "tDB") {
+    const data2 = readFileSync(
+      resolve(__dirname, "../../lua/contracts/weavedb_node.lua"),
+      "utf8",
+    )
 
-  const data2 = readFileSync(
-    resolve(__dirname, "../../lua/contracts/weavedb_node.lua"),
-    "utf8",
-  )
+    const { pid: pid2 } = await ao.spwn({})
+    await ao.wait({ pid: pid2 })
 
-  const { pid: pid2 } = await ao.spwn({})
-  await ao.wait({ pid: pid2 })
-
-  const { mid: mid2 } = await ao.load({
-    pid: pid2,
-    data: data2,
-    fills: { PARENT: pid, SOURCE: pid },
-  })
-
-  console.log(pid2)
+    const { mid: mid2 } = await ao.load({
+      pid: pid2,
+      data: data2,
+      fills: { PARENT: pid, SOURCE: pid },
+    })
+    console.log(pid2)
+  }
 }
 main()
