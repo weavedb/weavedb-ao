@@ -127,7 +127,6 @@ describe("WeaveDB", function () {
     }
 
     const res = await q("ppl", "Bob")
-
     expect(res).to.eql(bob)
     expect(await q("ppl")).to.eql([alice, beth, bob, mike])
     expect(await q("ppl", ["age", "desc"])).to.eql([beth, mike, alice, bob])

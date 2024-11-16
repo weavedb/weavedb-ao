@@ -39,9 +39,10 @@ const setup = async ({
   }
   if (opt) {
     const ar = await new AR(opt.ar).init(opt.jwk)
+    const src = new Src({ ar, readFileSync, dir })
     const ao = new AO({ ...opt.ao, ar })
     const profile = new Profile({ ...opt.profile, ao })
-    return { opt, ar, ao, profile }
+    return { opt, ar, ao, profile, src }
   }
   arweave ??= { port: 4000 }
   aoconnect ??= {
@@ -53,7 +54,11 @@ const setup = async ({
   await ar.gen("10")
   const src = new Src({ ar, readFileSync, dir })
   const wasm = await src.upload("aos", "wasm")
+  const wasm_aos2 = await src.upload("aos2_0_1", "wasm")
   const ao = new AO({ aoconnect, ar })
+  const { id: module_aos2 } = await ao.postModule({
+    data: await ar.data(wasm_aos2),
+  })
   const { scheduler } = await ao.postScheduler({
     url: "http://su",
     overwrite: true,
@@ -64,6 +69,10 @@ const setup = async ({
   })
   opt = { ar: { ...arweave }, jwk: ar.jwk }
   opt.ao = { module: module, scheduler, aoconnect, ar: opt.ar }
+  opt.modules = {
+    aos2: module_aos2,
+    aos1: module,
+  }
   if (cache) writeFileSync(optPath, JSON.stringify(opt))
   return { opt, ao, ar, src }
 }

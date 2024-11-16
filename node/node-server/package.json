@@ -17,7 +17,7 @@
     "@grpc/proto-loader": "~0.5.0",
     "@metamask/eth-sig-util": "^5.0.2",
     "@permaweb/ao-scheduler-utils": "^0.0.24",
-    "aonote": "^0.8.3",
+    "aonote": "^0.8.5",
     "archiver": "^5.3.1",
     "arweave": "^1.14.4",
     "aws-sdk": "^2.1306.0",
