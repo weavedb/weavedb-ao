@@ -165,8 +165,8 @@ class Rollup {
     for (let v of bundles) {
       if (isNil(v.data?.input)) continue
       const len = JSON.stringify(v.data.input).length
-      const max = this.type === "ao" ? 3500 : 15000
-      if (sizes + len > max) {
+      const max = 15000
+      if (this.type !== "ao" && sizes + len > max) {
         i += 1
         sizes = 0
         b[i] = { bundles: [], t: [], size: 0 }
@@ -226,6 +226,7 @@ class Rollup {
               for (let v of b) {
                 const { bundles, hash, t } = v
                 _hash = hash
+                /*
                 const signed = await warp.sign(
                   "bundle",
                   map(_path(["data", "input"]))(bundles),
@@ -237,19 +238,47 @@ class Rollup {
                     nonce: 1,
                     ar: this.bundler,
                   },
-                )
-                const diffs = o(flatten, map(_path(["data", "diff"])))(bundling)
+                )*/
+                const diffs = o(flatten, map(_path(["data", "diff"])))(bundles)
+                let _zkp = null
+                if (diffs.length > 0) {
+                  for (const v of diffs) {
+                    let col_id = this.cols[v.collection]
+                    if (!col_id) {
+                      col_id = await this.zkdb.addCollection()
+                      this.cols[v.collection] = col_id
+                    }
+                    const res = await this.zkdb.insert(col_id, v.doc, v.data)
+                  }
+                  let txs = diffs.map(v => {
+                    const col_id = this.cols[v.collection]
+                    return [col_id, v.doc, v.data]
+                  })
+                  console.log(txs)
+                  _zkp = this.zkdb.tree.F.toObject(
+                    this.zkdb.tree.root,
+                  ).toString()
+                  console.log("zkp hash:", _zkp)
+                }
                 const txs = map(v => {
                   return {
                     id: v.data.txid,
                     ts: v.data.tx_ts,
                     input: v.data.input,
                   }
-                })(bundling)
+                })(bundles)
+                const data = {
+                  diffs,
+                  txs,
+                  tx_height: last(bundles).id * 1,
+                  block_height: ++height,
+                  hash,
+                  zkdb: _zkp,
+                }
                 const { err, mid } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
-                  data: JSON.stringify({ diffs, txs }),
+                  data: JSON.stringify(data),
                   checkData: "committed!",
                 })
                 if (!err) {
@@ -261,25 +290,7 @@ class Rollup {
                     //duration: result.duration,
                   })
                   validity[mid] = true
-                  if (diffs.length > 0) {
-                    for (const v of diffs) {
-                      let col_id = this.cols[v.collection]
-                      if (!col_id) {
-                        col_id = await this.zkdb.addCollection()
-                        this.cols[v.collection] = col_id
-                      }
-                      const res = await this.zkdb.insert(col_id, v.doc, v.data)
-                    }
-                    let txs = diffs.map(v => {
-                      const col_id = this.cols[v.collection]
-                      return [col_id, v.doc, v.data]
-                    })
-                    console.log(txs)
-                    this.hash = this.zkdb.tree.F.toObject(
-                      this.zkdb.tree.root,
-                    ).toString()
-                    console.log("zkp hash:", this.hash)
-                  }
+                  this.hash = _zkp
                 } else {
                   // [TODO] need to handle this
                   console.log(err)
