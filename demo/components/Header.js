@@ -1,4 +1,5 @@
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
+import { map } from "ramda"
 import forge from "node-forge"
 import Arweave from "arweave"
 import {
@@ -76,6 +77,8 @@ export default function Header({
   toast,
   setBalance,
   setDeposit,
+  setIsDashboard,
+  isDashboard,
   setAddr,
   jwk,
   setJwk,
@@ -90,7 +93,7 @@ export default function Header({
       })()
     }
   }, [])
-
+  const page = isDashboard ? "Dashboard" : isWallet ? "Wallet" : "Demo"
   return (
     <Flex
       h="60px"
@@ -109,17 +112,54 @@ export default function Header({
       <Flex w="100%" maxW="1360px">
         <Flex align="center" color="#5137C5" fontWeight="bold">
           <Image mr={2} src="/logo.svg" boxSize="25px" />
-          {isWallet ? "WeaveWallet" : "WeaveDB Demos"}
+          <Box display={["none", null, "flex"]} alignItems="center">
+            {isDashboard
+              ? "Dashboard"
+              : isWallet
+                ? "WeaveWallet"
+                : "WeaveDB Demos"}
+          </Box>
         </Flex>
         <Box flex={1} />
+        {!addr ? null : (
+          <Flex align="center" fontSize={["12px", "14px"]} mr={4}>
+            {map(v => {
+              return (
+                <Box
+                  sx={{
+                    color: v.name === page ? "#5137C5" : "#222",
+                    cursor: "pointer",
+                    ":hover": { opacity: 0.75 },
+                    textDecoration: v.name === page ? "underline" : "",
+                  }}
+                  mx={[2, 3, 4]}
+                  onClick={() => {
+                    if (v.name === "Dashboard") {
+                      setIsWallet(false)
+                      setIsDashboard(true)
+                    } else if (v.name === "Wallet") {
+                      setIsWallet(true)
+                      setIsDashboard(false)
+                    } else {
+                      setIsWallet(false)
+                      setIsDashboard(false)
+                    }
+                  }}
+                >
+                  {v.name}
+                </Box>
+              )
+            })([{ name: "Demo" }, { name: "Dashboard" }, { name: "Wallet" }])}
+          </Flex>
+        )}
         <Flex
           h="40px"
           justify="center"
-          w={["130px", null, null, "150px"]}
+          w={["100px", "130px", null, "150px"]}
           align="center"
           bg={"#5137C5"}
           color="white"
-          fontSize={["14px", null, null, "16px"]}
+          fontSize={["12px", "14px", null, "16px"]}
           py={1}
           px={3}
           sx={{
@@ -130,10 +170,13 @@ export default function Header({
           onClick={async () => {
             if (!connecting) {
               let err = null
-              if (isWallet) {
-                setIsWallet(false)
-              } else if (addr) {
-                setIsWallet(true)
+              if (addr) {
+                if (confirm("Disconnect your wallet?")) {
+                  setIsWallet(false)
+                  setIsDashboard(false)
+                  setAddr(null)
+                  setJwk(null)
+                }
               } else {
                 setConnecting(true)
                 try {
@@ -346,13 +389,6 @@ export default function Header({
         >
           {connecting ? (
             <Box as="i" className="fas fa-spin fa-circle-notch" />
-          ) : isWallet ? (
-            <Flex align="center" w="100%">
-              <Box as="i" className="fas fa-arrow-left" mx={2} />
-              <Box align="center" flex={1}>
-                Back
-              </Box>
-            </Flex>
           ) : addr ? (
             addr.slice(0, 10)
           ) : (

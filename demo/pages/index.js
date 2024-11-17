@@ -196,6 +196,7 @@ export default function Home({ _date = null }) {
   const [depositing, setDepositing] = useState(false)
   const [sending, setSending] = useState(false)
   const toast = useToast()
+  const [isDashboard, setIsDashboard] = useState(false)
   const [isWallet, setIsWallet] = useState(false)
   const [isSend, setIsSend] = useState(false)
   const [isScan, setIsScan] = useState(false)
@@ -392,6 +393,8 @@ export default function Home({ _date = null }) {
     <>
       <Header
         {...{
+          isDashboard,
+          setIsDashboard,
           isWallet,
           setIsWallet,
           jwk,
@@ -403,7 +406,194 @@ export default function Home({ _date = null }) {
           setAddr,
         }}
       />
-      {isWallet ? (
+      {isDashboard ? (
+        <Box mt="60px">
+          <Flex justify="center">
+            <Box w="100%" maxW="1150px" py={[6, 8, 10]} px={[4, 6, 10]}>
+              <Flex>
+                <Flex direction="column" justify="center" flex={1}>
+                  <Box fontSize="16px" color="#999" align="center">
+                    Your tDB
+                  </Box>
+                  <Flex align="center" fontSize="35px" justify="center">
+                    <Image src="/logo.svg" mr={4} boxSize="35px" />
+                    {((balance?.amount ?? 0) / 10 ** 12).toFixed(12)}
+                  </Flex>
+                  <Box fontSize="16px" color="#999" align="center">
+                    / 10,000,000,000
+                  </Box>
+                </Flex>
+                <Box flex={1}>
+                  <Box
+                    m={4}
+                    p={6}
+                    sx={{ border: "1px solid #9C89F6", borderRadius: "5px" }}
+                  >
+                    <Flex align="center" fontSize="20px" mb={4}>
+                      <Image src="/logo.svg" boxSize="24px" />
+                      <Box mx={4}>:</Box>
+                      tDB ( Testnet Database ) Token
+                    </Flex>
+                    <Flex align="center" fontSize="12px" color="#666" my={2}>
+                      Address :{" "}
+                      <Box
+                        ml={1}
+                        sx={{
+                          color: "#5137C5",
+                          cursor: "pointer",
+                          ":hover": { opacity: 0.75 },
+                          textDecoration: "underline",
+                        }}
+                      >
+                        <Link
+                          target="_blank"
+                          href={`https://ao.link/#/token/${process.env.NEXT_PUBLIC_ADMIN_CONTRACT}`}
+                        >
+                          {process.env.NEXT_PUBLIC_TDB}
+                        </Link>
+                      </Box>
+                    </Flex>
+                    <Flex align="center" fontSize="12px" color="#666" my={2}>
+                      Total Supply : 10,000,000,000
+                    </Flex>
+                    <Flex align="center" fontSize="12px" color="#666" my={2}>
+                      Annual Inflation : 10 %
+                    </Flex>
+                  </Box>
+                </Box>
+              </Flex>
+              <Box>
+                {map(v => {
+                  console.log(v)
+                  return (
+                    <Flex
+                      sx={{
+                        border: "1px solid #9C89F6",
+                        borderRadius: "3px",
+                      }}
+                      m={4}
+                      align="center"
+                    >
+                      <Box p={4} w="150px">
+                        <Box fontWeight="bold" fontSize="18px" color="#5137C5">
+                          {v.id}
+                        </Box>
+                        <Box fontSize="12px" color="#666">
+                          wdb.ae
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          1
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            tDB
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Price / Tx
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          1000
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            txs
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Writes
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          1000
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            tDB
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Base Profit
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          1000
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            taoETH
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Total Stake
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          100
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            taoETH
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Your Stake
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          10
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            tDB
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Your Profit
+                        </Box>
+                      </Box>
+                      <Box p={4} flex={1} fontSize="12px">
+                        <Flex my={1} color="#5137C5">
+                          Stake taoETH
+                        </Flex>
+                        <Flex my={1} color="#5137C5">
+                          Withdraw
+                        </Flex>
+                      </Box>
+                    </Flex>
+                  )
+                })(dbs)}
+              </Box>
+            </Box>
+          </Flex>
+        </Box>
+      ) : isWallet ? (
         <Box mt="60px">
           <Flex justify="center">
             <Box w="100%" maxW="600px">
@@ -856,9 +1046,10 @@ export default function Home({ _date = null }) {
                         }}
                         onClick={() => {
                           if (confirm("Disconnect your wallet?")) {
+                            setIsWallet(false)
+                            setIsDashboard(false)
                             setAddr(null)
                             setJwk(null)
-                            setIsWallet(false)
                           }
                         }}
                       >
