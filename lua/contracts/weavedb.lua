@@ -1,6 +1,8 @@
 local json = require("json")
 data = data or {}
+init = init or false
 if bundler ~= '<BUNDLER>' then bundler = '<BUNDLER>' end
+if staking ~= '<STAKING>' then staking = '<STAKING>' end
 
 local function err(message)
   error(message)
@@ -403,6 +405,23 @@ local function query_data(query)
 end
 
 Handlers.add(
+  "Init-DB",
+  "Init-DB",
+  function(msg)
+    assert(init == false, 'Already initialized!')
+    assert(msg.From == ao.env.Process.Owner, "Only owner can execute!");
+    assert(type(msg["Node"]) == 'string', 'Node is required!')
+    local isInit = Send({ Target = staking, Action = "Init-DB", Node = msg.Node }).receive().Data
+    if isInit == "initialized!" then
+      init = true
+      msg.reply({ Data = 'DB initialized!' })
+    else
+      msg.reply({ Data = 'DB not initialized!' })
+    end
+  end
+)
+
+Handlers.add(
   "Set-Bundler",
   "Set-Bundler",
   function(msg)
@@ -432,7 +451,19 @@ Handlers.add(
 	end
       end
     end
-    msg.reply({ Data = 'committed!'})
+    local result = Send({
+	Target = staking,
+	Action = "Rollup",
+	Block = tostring(_data.block_height),
+	Txs = tostring(#_data.txs),
+	Hash = _data.hash,
+	["ZK-Root"] = _data.zkdb
+    }).receive().Data
+    if result == "rolled up!" then
+      msg.reply({ Data = 'committed!' })
+    else
+      msg.reply({ Data = 'failed!'})
+    end
   end
 )
 
