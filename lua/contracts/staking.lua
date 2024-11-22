@@ -63,6 +63,7 @@ Handlers.add(
   "Add-DB",
   function (msg)
     assert(type(msg.Node) == 'string' and nodes[msg.Node] ~= nil, 'Valid Node is required!')
+    assert(type(msg.Allocations) == 'string', 'Allocations is required!')
     assert(nodes[msg.Node].admin == msg.From, 'Only node admin can execute!')
     assert(type(msg.DB) == 'string', 'DB is required!')
     assert(type(msg.Process) == 'string' and isValidAddr(msg.Process), 'Valid Process is required!')
@@ -78,7 +79,15 @@ Handlers.add(
       price = msg.Price,
       process = msg.Process
     }
+    local allocations = json.decode(msg.Allocations)
+    for k, v in pairs(allocations) do
+      assert(bint.__lt(0, bint(v)), 'alloc must be greater than 0')
+      if k ~= "infra" and k ~= "validators" and k ~= "protocol" and not isValidAddr(k) then
+	assert(false, 'invalid allocation address')
+      end
+    end
     dbs[msg.Process] = {
+      allocations = allocations,
       init = false,
       db = msg.DB,
       node = msg.Node,
@@ -258,16 +267,33 @@ Handlers.add(
       block.finalized = true
       db.height = db.height + 1
       db.profit = m.add(db.profit, price)
-      local reward = m.floor(m.div(price, "2"))
+      local total_alloc = "0"
+      for k, v in pairs(db.allocations) do
+	total_alloc = m.add(total_alloc, v)
+      end
       local total = price
       local validator_total = "0"
+      local reward_base = "0"
+      for k, v in pairs(db.allocations) do
+	local amount = m.floor(m.div(m.mul(price, v), total_alloc))
+	if k == "protocol" then
+	  total = m.sub(total, amount)
+	  Balances[ao.id] = Balances[ao.id] or "0"
+	  Balances[ao.id] = m.add(Balances[ao.id], amount)
+	elseif k == "validators" then
+	  reward_base = amount
+	elseif k ~= "infra" then
+	  total = m.sub(total, amount)
+	  Balances[k] = Balances[k] or "0"
+	  Balances[k] = m.add(Balances[k], amount)
+	end
+	end
       for k, v in pairs(block.validators) do
 	validator_total = m.add(validator_total, info.stakes[k])
 	for k2, v2 in pairs(info.delegates[k]) do
 	  validator_total = m.add(validator_total, v2)
 	end
       end
-      local reward_base = m.sub(price, reward)
       local admin = nodes[db.node].admin
       Balances[admin] = Balances[admin] or "0"
       for k, v in pairs(block.validators) do

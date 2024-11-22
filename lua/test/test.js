@@ -12,7 +12,7 @@ const mike = { name: "Mike", age: 15, favs: ["lemon", "peach"] }
 const beth = { name: "Beth", age: 20, favs: ["grape", "peach"] }
 const jeff = { name: "Jeff", age: 25, favs: ["apple", "peach"] }
 const david = { name: "David", age: 25, favs: ["lemon"] }
-const ppl = [bob, alice, mike, beth, jeff, david]
+const ppl = [bob, alice, mike, beth, jeff, david, beth, jeff, david, bob]
 
 const rmNull = obj => {
   for (let k in obj) {
@@ -386,6 +386,12 @@ describe("WeaveDB", function () {
       await stake.m(
         "Add-DB",
         {
+          Allocations: JSON.stringify({
+            infra: "40",
+            protocol: "10",
+            validators: "40",
+            [delegator_2.addr]: "10",
+          }),
           Node: "1",
           DB: "demo",
           Price: "1",
@@ -456,7 +462,8 @@ describe("WeaveDB", function () {
       },
       { check: "finalized!", jwk: validator_2.jwk },
     )
-    await withdrawDB(3, infra.jwk)
+    await withdrawDB(5, infra.jwk)
+    console.log(await stake.d("Balances", null, { get: true }))
   })
 
   it("should deploy tDB token and subledgers", async () => {
