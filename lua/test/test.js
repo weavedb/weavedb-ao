@@ -1,4 +1,4 @@
-import { setup, ok, fail } from "aonote/test/helpers.js"
+import { Src, setup, ok, fail } from "aonote/test/helpers.js"
 import { expect } from "chai"
 import { AR, AO } from "aonote"
 import { readFileSync } from "fs"
@@ -57,10 +57,11 @@ function to64(x) {
 
 describe("WeaveDB", function () {
   this.timeout(0)
-  let ao, ao2, opt, profile, ar, thumbnail, banner
+  let ao, ao2, opt, profile, ar, thumbnail, banner, src
 
   before(async () => {
     ;({ thumbnail, banner, opt, ao, ao2, ar, profile } = await setup({}))
+    src = new Src({ ar, dir: resolve(import.meta.dirname, "../contracts") })
   })
 
   it.skip("should generate valid arweave keys with node-forge", async () => {
@@ -231,62 +232,52 @@ describe("WeaveDB", function () {
   })
 
   it.only("should deploy staking contract", async () => {
+    const { p } = ok(await ao2.deploy({ src_data: src.data("staking2") }))
+    await p.m("setup", { ts: 1, pool: 60, dur: 5 })
+    await p.m("stake", { ts: 1, addr: "a", deposit: 2 })
+    await p.m("stake", { ts: 2, addr: "b", deposit: 1 })
+    await p.m("stake", { ts: 3, addr: "c", deposit: 3 })
+    await p.m("unstake", { ts: 4, addr: "a", deposit: 1 })
+    await p.m("unstake", { ts: 4, addr: "b", deposit: 1 })
+    await p.m("stake", { ts: 5, addr: "c", deposit: 2 })
+    expect((await p.d("get", { ts: 6, addr: "a" })).amount).to.eql("29")
+    expect((await p.d("get", { ts: 6, addr: "b" })).amount).to.eql("6")
+    expect((await p.d("get", { ts: 6, addr: "c" })).amount).to.eql("25")
+    return
+  })
+
+  it("should deploy staking contract", async () => {
     const infra = await ar.gen()
     const validator_1 = await ar.gen()
     const validator_2 = await ar.gen()
     const delegator_1 = await ar.gen()
     const delegator_2 = await ar.gen()
+    const { pid: _db, p: db } = ok(
+      await ao2.deploy({ src_data: src.data("tDB") }),
+    )
+    expect(await db.d("Info", "Name")).to.eql("Testnet DB")
+    const { pid: _eth, p: eth } = ok(
+      await ao2.deploy({ src_data: src.data("taoETH") }),
+    )
+    expect(await eth.d("Info", "Name")).to.eql("Testnet aoETH")
 
-    const data = readFileSync(
-      resolve(import.meta.dirname, "../contracts/tDB.lua"),
-      "utf8",
-    )
-    const { pid } = ok(await ao2.deploy({ src_data: data }))
-    expect((await ao2.dry({ pid, act: "Info", get: "Name" })).out).to.eql(
-      "Testnet DB",
-    )
-    const data2 = readFileSync(
-      resolve(import.meta.dirname, "../contracts/taoETH.lua"),
-      "utf8",
-    )
-    const { pid: pid2 } = ok(await ao2.deploy({ src_data: data2 }))
-    expect((await ao2.dry({ pid: pid2, act: "Info", get: "Name" })).out).to.eql(
-      "Testnet aoETH",
-    )
-    const data3 = readFileSync(
-      resolve(import.meta.dirname, "../contracts/staking.lua"),
-      "utf8",
-    )
-    const { pid: pid3 } = ok(
-      await ao2.deploy({ src_data: data3, fills: { DB: pid, TOKEN: pid2 } }),
-    )
-    const data4 = readFileSync(
-      resolve(import.meta.dirname, "../contracts/weavedb.lua"),
-      "utf8",
-    )
-    const { pid: pid4 } = ok(
+    const { pid: _stake, p: stake } = ok(
       await ao2.deploy({
-        src_data: data4,
-        fills: { BUNDLER: infra.addr, STAKING: pid3 },
+        src_data: src.data("staking"),
+        fills: { DB: _db, TOKEN: _eth },
       }),
     )
-    const _db = pid
-    const _eth = pid2
-    const _stake = pid3
-    const _weavedb = pid4
-
-    const db = ao2.p(_db)
-    const eth = ao2.p(_eth)
-    const stake = ao2.p(_stake)
-    const weavedb = ao2.p(_weavedb)
-
+    const { pid: _wdb, p: wdb } = ok(
+      await ao2.deploy({
+        src_data: src.data("weavedb"),
+        fills: { BUNDLER: infra.addr, STAKING: _stake },
+      }),
+    )
     const bal = async (p, qty, tar) => {
       tar ??= ar.addr
-      expect((await p.d("Balances", null, { get: true }))[tar]).to.eql(
-        Number(qty).toString(),
-      )
+      expect((await p.d("Balances"))[tar]).to.eql(Number(qty).toString())
     }
-    const getNodes = async () => await stake.d("Get-Nodes", null, { get: true })
+    const getNodes = async () => await stake.d("Get-Nodes")
 
     const stakeBal = async (qty, tar) => {
       tar ??= ar.addr
@@ -295,11 +286,7 @@ describe("WeaveDB", function () {
     }
 
     const mint = async (p, qty, exp, jwk) => {
-      await p.m(
-        "Mint",
-        { Quantity: Number(qty).toString() },
-        { check: /minted/, jwk },
-      )
+      await p.m("Mint", { Quantity: qty }, { check: /minted/, jwk })
       if (!isNil(exp)) await bal(p, exp, jwk ? await ar.toAddr(jwk) : null)
     }
 
@@ -308,8 +295,8 @@ describe("WeaveDB", function () {
         "Transfer",
         {
           Recipient: to,
-          Quantity: Number(qty).toString(),
-          "X-Node": "1",
+          Quantity: qty,
+          "X-Node": 1,
           "X-DB": "demo",
         },
         { check: /transferred/, jwk },
@@ -321,8 +308,8 @@ describe("WeaveDB", function () {
         "Transfer",
         {
           Recipient: to,
-          Quantity: Number(qty).toString(),
-          "X-Node": "1",
+          Quantity: qty,
+          "X-Node": 1,
           "X-DB": "demo",
           "X-Action": "Delegate",
           "X-Delegate-To": who,
@@ -334,7 +321,7 @@ describe("WeaveDB", function () {
     const send = async (p, qty, exp, to = _stake, jwk) => {
       await p.m(
         "Transfer",
-        { Recipient: to, Quantity: Number(qty).toString() },
+        { Recipient: to, Quantity: qty },
         { check: /transferred/, jwk },
       )
       if (!isNil(exp)) await bal(p, exp, jwk ? await ar.toAddr(jwk) : null)
@@ -343,7 +330,7 @@ describe("WeaveDB", function () {
     const withdraw = async (qty, exp, exp_stake, jwk) => {
       await stake.m(
         "Withdraw",
-        { Quantity: Number(qty).toString(), Node: "1", DB: "demo" },
+        { Quantity: qty, Node: 1, DB: "demo" },
         { check: /withdrew/, jwk },
       )
       if (!isNil(exp)) await bal(eth, exp, jwk ? await ar.toAddr(jwk) : null)
@@ -374,7 +361,7 @@ describe("WeaveDB", function () {
         "Transfer",
         {
           Recipient: _stake,
-          Quantity: "1",
+          Quantity: 1,
           "X-Action": "Add-Node",
           "X-URL": "https://test.wdb.ae",
         },
@@ -386,18 +373,18 @@ describe("WeaveDB", function () {
       await stake.m(
         "Add-DB",
         {
-          Allocations: JSON.stringify({
+          Allocations: {
             infra: "40",
             protocol: "10",
             validators: "40",
             [delegator_2.addr]: "10",
-          }),
-          Node: "1",
+          },
+          Node: 1,
           DB: "demo",
-          Price: "1",
-          Process: _weavedb,
-          Validators: "2",
-          "Min-Stake": "1",
+          Price: 1,
+          Process: _wdb,
+          Validators: 2,
+          "Min-Stake": 1,
         },
         { jwk: infra.jwk, check: "db added!" },
       )
@@ -412,16 +399,14 @@ describe("WeaveDB", function () {
     await mint(db, 10000, 10000)
     await addNode()
     await addDB()
-    await weavedb.m("Init-DB", { Node: "1" }, { check: "DB initialized!" })
-    expect(
-      (await stake.d("Get-DB", { DB: _weavedb }, { get: true })).init,
-    ).to.eql(true)
+    await wdb.m("Init-DB", { Node: 1 }, { check: "DB initialized!" })
+    expect((await stake.d("Get-DB", { DB: _wdb })).init).to.eql(true)
     await transfer(eth, 1, 9, _stake, validator_1.jwk)
     await transfer(eth, 3, 7, _stake, validator_2.jwk)
     await transfer(db, 100, 9900)
     await withdraw(2, 9, 1, validator_2.jwk)
     await delegate(validator_1.addr, 1, 9, _stake, delegator_1.jwk)
-    const out = await weavedb.m("Rollup", null, {
+    const out = await wdb.m("Rollup", {
       jwk: infra.jwk,
       data: {
         hash: "abc",
@@ -442,8 +427,8 @@ describe("WeaveDB", function () {
     await stake.m(
       "Validate",
       {
-        DB: _weavedb,
-        Block: "1",
+        DB: _wdb,
+        Block: 1,
         Txs: ppl.length.toString(),
         Hash: "abc",
         ["ZK-Root"]: "def",
@@ -454,8 +439,8 @@ describe("WeaveDB", function () {
     await stake.m(
       "Validate",
       {
-        DB: _weavedb,
-        Block: "1",
+        DB: _wdb,
+        Block: 1,
         Txs: ppl.length.toString(),
         Hash: "abc",
         ["ZK-Root"]: "def",
@@ -463,7 +448,7 @@ describe("WeaveDB", function () {
       { check: "finalized!", jwk: validator_2.jwk },
     )
     await withdrawDB(5, infra.jwk)
-    console.log(await stake.d("Balances", null, { get: true }))
+    console.log(await stake.d("Balances"))
   })
 
   it("should deploy tDB token and subledgers", async () => {
