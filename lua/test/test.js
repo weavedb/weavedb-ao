@@ -240,9 +240,9 @@ describe("WeaveDB", function () {
     await p.m("unstake", { ts: 4, addr: "a", deposit: 1 })
     await p.m("unstake", { ts: 4, addr: "b", deposit: 1 })
     await p.m("stake", { ts: 5, addr: "c", deposit: 2 })
-    expect((await p.d("get", { ts: 6, addr: "a" })).amount).to.eql("29")
-    expect((await p.d("get", { ts: 6, addr: "b" })).amount).to.eql("6")
-    expect((await p.d("get", { ts: 6, addr: "c" })).amount).to.eql("25")
+    expect((await p.d("get", { ts: 7, addr: "a" })).amount).to.eql("29")
+    expect((await p.d("get", { ts: 7, addr: "b" })).amount).to.eql("6")
+    expect((await p.d("get", { ts: 7, addr: "c" })).amount).to.eql("25")
     return
   })
 
@@ -324,14 +324,13 @@ describe("WeaveDB", function () {
         {
           Recipient: _stake,
           Quantity: qty,
-          "X-Duration": 10000,
+          "X-Duration": 300000,
           "X-Action": "Set-Reward",
         },
         { check: /transferred/, jwk },
       )
       if (!isNil(exp)) await bal(db, exp, jwk ? await ar.toAddr(jwk) : null)
     }
-
     const send = async (p, qty, exp, to = _stake, jwk) => {
       await p.m(
         "Transfer",
@@ -403,8 +402,9 @@ describe("WeaveDB", function () {
         { jwk: infra.jwk, check: "db added!" },
       )
     }
-    await mint(db, 110000, 110000)
-    await setReward(100000, 10000)
+    await mint(db, 20000, 20000)
+    await setReward(10000, 10000)
+    const start = Date.now()
     await mint(eth, 100, 100)
     await send(eth, 10, 90, infra.addr)
     await send(eth, 10, 80, validator_1.addr)
