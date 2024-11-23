@@ -12,7 +12,7 @@ local m = {
     return tostring(bint(a) * bint(b))
   end,
   div = function(a, b)
-    return tostring(bint(a) / bint(b))
+    return tostring(math.floor(bint(a) / bint(b)))
   end,
   toBalanceValue = function(a)
     return tostring(bint(a))
@@ -37,11 +37,11 @@ local dur = nil
 
 local getStakes = function (msg, unstake)
     addr = msg.addr
-    local r = m.floor(m.div(m.mul(pool, m.sub(msg.ts, ts)), dur))
-    if bint(total) > 0 then k = m.add(k, m.floor(m.div(r, total))) end
+    local r = m.div(m.mul(pool, m.sub(msg.ts, ts)), dur)
+    if bint(total) > 0 then k = m.add(k, m.div(r, total)) end
     stakes[addr] = stakes[addr] or { amount = 0, k = k, bal = 0 }
     ts = msg.ts
-    local amount = 0
+    local amount = "0"
     if unstake then
       amount = msg.deposit
     else
