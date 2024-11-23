@@ -231,7 +231,7 @@ describe("WeaveDB", function () {
     */
   })
 
-  it.only("should deploy staking contract", async () => {
+  it("should deploy staking contract", async () => {
     const { p } = ok(await ao2.deploy({ src_data: src.data("staking2") }))
     await p.m("setup", { ts: 1, pool: 60, dur: 5 })
     await p.m("stake", { ts: 1, addr: "a", deposit: 2 })
@@ -246,7 +246,7 @@ describe("WeaveDB", function () {
     return
   })
 
-  it("should deploy staking contract", async () => {
+  it.only("should deploy staking contract", async () => {
     const infra = await ar.gen()
     const validator_1 = await ar.gen()
     const validator_2 = await ar.gen()
@@ -318,6 +318,20 @@ describe("WeaveDB", function () {
       )
       if (!isNil(exp)) await bal(eth, exp, jwk ? await ar.toAddr(jwk) : null)
     }
+    const setReward = async (qty, exp, jwk) => {
+      await db.m(
+        "Transfer",
+        {
+          Recipient: _stake,
+          Quantity: qty,
+          "X-Duration": 10000,
+          "X-Action": "Set-Reward",
+        },
+        { check: /transferred/, jwk },
+      )
+      if (!isNil(exp)) await bal(db, exp, jwk ? await ar.toAddr(jwk) : null)
+    }
+
     const send = async (p, qty, exp, to = _stake, jwk) => {
       await p.m(
         "Transfer",
@@ -389,14 +403,14 @@ describe("WeaveDB", function () {
         { jwk: infra.jwk, check: "db added!" },
       )
     }
-
+    await mint(db, 110000, 110000)
+    await setReward(100000, 10000)
     await mint(eth, 100, 100)
     await send(eth, 10, 90, infra.addr)
     await send(eth, 10, 80, validator_1.addr)
     await send(eth, 10, 70, validator_2.addr)
     await send(eth, 10, 60, delegator_1.addr)
     await send(eth, 10, 50, delegator_2.addr)
-    await mint(db, 10000, 10000)
     await addNode()
     await addDB()
     await wdb.m("Init-DB", { Node: 1 }, { check: "DB initialized!" })
@@ -448,7 +462,7 @@ describe("WeaveDB", function () {
       { check: "finalized!", jwk: validator_2.jwk },
     )
     await withdrawDB(5, infra.jwk)
-    console.log(await stake.d("Balances"))
+    console.log(await stake.d("Balance", { Recipient: validator_1.addr }))
   })
 
   it("should deploy tDB token and subledgers", async () => {
