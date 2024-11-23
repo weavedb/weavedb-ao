@@ -567,10 +567,10 @@ anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aonote@^0.9.4:
-  version "0.9.4"
-  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.9.4.tgz#13fcb964060e5bc7b43484d51cb25a5643a158e8"
-  integrity sha512-9MqgmExos1q+jrGz/JqsVu/FLxU0MCgkWRO0r3/P64Nmwogc4dDzdnD0rKBoUwiQx13iqvAYvufE4PH+hGPCKw==
+aonote@^0.10.1:
+  version "0.10.1"
+  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.10.1.tgz#ee58857ff52145080f9f4f187f1dec1e980f34cb"
+  integrity sha512-pgG+BV4Rea2HDBvKw7de94We2Aq9TLRimWRY3BEoSpInzCdH7DxIBhTF14vD5bTP1yqmlHeyg6Wy5EX3qWsD8A==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
     "@permaweb/aoconnect" "^0.0.61"

@@ -15,8 +15,7 @@ local m = {
     return tostring(bint(a) * bint(b))
   end,
   div = function(a, b)
-    return tostring(bint(a) / bint(b))
-  end,
+    return tostring(math.floor(bint(a) / bint(b)))
   toBalanceValue = function(a)
     return tostring(bint(a))
   end,
@@ -275,7 +274,7 @@ Handlers.add(
       local validator_total = "0"
       local reward_base = "0"
       for k, v in pairs(db.allocations) do
-	local amount = m.floor(m.div(m.mul(price, v), total_alloc))
+	local amount = m.div(m.mul(price, v), total_alloc)
 	if k == "protocol" then
 	  total = m.sub(total, amount)
 	  Balances[ao.id] = Balances[ao.id] or "0"
@@ -298,12 +297,12 @@ Handlers.add(
       Balances[admin] = Balances[admin] or "0"
       for k, v in pairs(block.validators) do
 	Balances[k] = Balances[k] or "0"
-	local v_reward = m.floor(m.div(m.mul(reward_base, info.stakes[k]), validator_total))
+	local v_reward = m.div(m.mul(reward_base, info.stakes[k]), validator_total)
 	Balances[k] = m.add(Balances[k], v_reward)
 	total = m.sub(total, v_reward)
 	for k2, v2 in pairs(info.delegates[k]) do
 	  Balances[k2] = Balances[k2] or "0"
-	  local v_reward = m.floor(m.div(m.mul(reward_base, v2), validator_total))
+	  local v_reward = m.div(m.mul(reward_base, v2), validator_total)
 	  Balances[k2] = m.add(Balances[k2], v_reward)
 	  total = m.sub(total, v_reward)
 	end
