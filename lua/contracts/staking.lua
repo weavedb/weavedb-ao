@@ -119,6 +119,8 @@ Handlers.add(
 )
 
 local getStakes = function (addr, deposit, timestamp, unstake)
+  local deadline = m.add(rewards.duration, rewards.start)
+  if bint.__le(bint(deadline), bint(timestamp)) then timestamp = deadline end
   local r = m.div(m.mul(rewards.pool, m.sub(timestamp, rewards.ts)), rewards.duration)
   if bint(rewards.total) > 0 then rewards.k = m.add(rewards.k, m.div(r, rewards.total)) end
   rewards.stakes[addr] = rewards.stakes[addr] or { amount = 0, k = rewards.k, bal = 0 }
@@ -130,7 +132,7 @@ local getStakes = function (addr, deposit, timestamp, unstake)
     amount = rewards.stakes[addr].amount
   end
   local reward = m.mul(amount,  (m.sub(rewards.k, rewards.stakes[addr].k)))
-    rewards.stakes[addr].bal = m.add(rewards.stakes[addr].bal, reward)
+  rewards.stakes[addr].bal = m.add(rewards.stakes[addr].bal, reward)
 end
 
 local stake = function(addr, deposit, timestamp)
@@ -191,6 +193,7 @@ Handlers.add(
 	rewards = {
 	  pool = msg.Quantity,
 	  ts = msg.Timestamp,
+	  start = msg.Timestamp,
 	  duration = msg["X-Duration"],
 	  k = "0",
 	  total = "0",

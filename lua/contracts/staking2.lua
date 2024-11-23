@@ -32,23 +32,25 @@ local pool = nil
 local stakes = {}
 local total = "0"
 local ts = nil
+local start = nil
 local k = "0"
 local dur = nil
 
-local getStakes = function (msg, unstake)
-    addr = msg.addr
-    local r = m.div(m.mul(pool, m.sub(msg.ts, ts)), dur)
-    if bint(total) > 0 then k = m.add(k, m.div(r, total)) end
-    stakes[addr] = stakes[addr] or { amount = 0, k = k, bal = 0 }
-    ts = msg.ts
-    local amount = "0"
-    if unstake then
-      amount = msg.deposit
-    else
-      amount = stakes[addr].amount
-    end
-    local reward = m.mul(amount,  (m.sub(k, stakes[addr].k)))
-    stakes[addr].bal = m.add(stakes[addr].bal, reward)
+local getStakes = function (addr, deposit, timestamp, unstake)
+  local deadline = m.add(dur, start)
+  if bint.__le(bint(deadline), bint(timestamp)) then timestamp = deadline end
+  local r = m.div(m.mul(pool, m.sub(timestamp, ts)), dur)
+  if bint(total) > 0 then k = m.add(k, m.div(r, total)) end
+  stakes[addr] = stakes[addr] or { amount = 0, k = k, bal = 0 }
+  ts = timestamp
+  local amount = "0"
+  if unstake then
+    amount = deposit
+  else
+    amount = stakes[addr].amount
+  end
+  local reward = m.mul(amount,  (m.sub(k, stakes[addr].k)))
+  stakes[addr].bal = m.add(stakes[addr].bal, reward)
 end
 
 Handlers.add(
@@ -57,6 +59,7 @@ Handlers.add(
   function(msg)
     pool = msg.pool
     ts = msg.ts
+    start = msg.ts
     dur = msg.dur
     msg.reply({	Data = "set!" })
   end
@@ -68,7 +71,7 @@ Handlers.add(
   function(msg)
     deposit = msg.deposit
     addr = msg.addr
-    getStakes(msg)
+    getStakes(addr, deposit, msg.ts)
     stakes[addr].amount = m.add(stakes[addr].amount, deposit)
     stakes[addr].k = k
     total = m.add(total, deposit)
@@ -82,7 +85,7 @@ Handlers.add(
   function(msg)
     deposit = msg.deposit
     addr = msg.addr
-    getStakes(msg, true)
+    getStakes(addr, deposit, msg.ts, true)
     stakes[addr].amount = m.sub(stakes[addr].amount, deposit)
     total = m.sub(total, deposit)
     msg.reply({	Data = "unstaked!" })
@@ -110,7 +113,7 @@ Handlers.add(
   "get",
   function(msg)
     addr = msg.addr
-    getStakes(msg)
+    getStakes(addr, nil, msg.ts)
     msg.reply({	Data = json.encode({ amount = stakes[addr].bal, addr = addr, ts = ts }) })
   end
 )
