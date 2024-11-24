@@ -21,13 +21,14 @@ const main = async () => {
   if (network === "localhost") {
     opt2 = {
       ar,
-      module: "YTNXvQu2x21DD6Pm8zicVBghB-BlnM5VRrVRyfhBPP8",
-      scheduler: "-_vZZQMEnvJmiIIfHfp_KuuV6ud2b9VSThfTmYytYQ8",
+      module: "1S5sWs0XULwHFlOtNN4EHASi-xXkzx9osCFj83senNU",
+      scheduler: "KiStqoG_7xh-MrY6m1AWnfhCgFRuPpZWcOhPwjud-mw",
       aoconnect: {
         MU_URL: "http://localhost:4002",
         CU_URL: "http://localhost:4004",
         GATEWAY_URL: "http://localhost:4000",
       },
+      authority: "XztbUZU7D8lAcWlbg0avCD0s2lMBbFGgTC4YzLcOR90",
     }
   }
   const ao = new AO(opt2)
@@ -35,25 +36,19 @@ const main = async () => {
     resolve(__dirname, `../../lua/contracts/${token}.lua`),
     "utf8",
   )
-  const { err, pid } = await ao.spwn({})
-  console.log(pid)
-  await ao.wait({ pid })
-  console.log("deployed!!")
-  const { mid } = await ao.load({ pid, data })
+  const { err, pid, p } = await ao.deploy({ src_data: data })
+  console.log(token + " deployed: " + pid)
   console.log("Now minting token...")
-  await ao.msg({
-    pid,
-    act: "Mint",
-    tags: {
-      Quantity:
-        token === "tDB" ? "10000000000000000" : "10000000000000000000000",
-    },
-  })
   console.log(
-    (await ao.dry({ pid, act: "Balances", get: { data: true, json: true } }))
-      .out[ao.ar.addr],
+    await p.msg("Mint", {
+      Quantity:
+        token === "tDB"
+          ? "1000000000" + "000000000000"
+          : "1000000" + "000000000000000000",
+    }),
   )
-  if (token === "tDB") {
+  console.log(await p.d("Balances"))
+  if (token === "tDB" && false) {
     const data2 = readFileSync(
       resolve(__dirname, "../../lua/contracts/weavedb_node.lua"),
       "utf8",

@@ -20,7 +20,7 @@ local utils = {
 
 Denomination = Denomination or 12
 Balances = Balances or { [ao.id] = "0" }
-TotalSupply = TotalSupply or utils.toBalanceValue(10000 * 10 ^ Denomination)
+TotalSupply = TotalSupply or "0"
 Name = 'Testnet WDB'
 Ticker = 'tdbWDB'
 Logo = 'sUvAzEo-s7JwDV3_JgRCo5uwjaV5koBIi5eFe0sFjCc'
@@ -36,7 +36,7 @@ Handlers.add(
   function (msg)
     assert(msg.From == parent, 'Not from parent token!')
     Balances[msg.Tags.Sender] = Balances[msg.Tags.Sender] or "0"
-    Balances[msg.Tags.Sender] = util.add(Balances[msg.Tags.Sender], msg.Quantity)
+    Balances[msg.Tags.Sender] = utils.add(Balances[msg.Tags.Sender], msg.Quantity)
   end
 )
 
@@ -86,7 +86,6 @@ Handlers.add(
     })
   end
 )
-
 
 Handlers.add(
   'transfer',
@@ -154,7 +153,7 @@ Handlers.add(
     assert(type(qty) == 'number', 'qty must be number')
     
     if bint(Balances[msg.From]) >= bint(msg.Quantity) then
-      Balances[msg.From] = util.subtract(Balances[msg.From], msg.Quantity)
+      Balances[msg.From] = utils.subtract(Balances[msg.From], msg.Quantity)
       ao.send({
 	  Target = parent,
 	  Tags = {

@@ -57,7 +57,7 @@ function to64(x) {
 
 describe("WeaveDB", function () {
   this.timeout(0)
-  let ao, ao2, opt, profile, ar, thumbnail, banner, src
+  let ao, ao2, opt, profile, ar, thumbnail, banner, src, data
 
   before(async () => {
     ;({ thumbnail, banner, opt, ao, ao2, ar, profile } = await setup({}))
@@ -95,7 +95,7 @@ describe("WeaveDB", function () {
     )
     const { err, pid } = await ao.spwn({})
     await ao.wait({ pid })
-    ok(await ao.load({ pid, data, fills: { BUNDLER: ao.ar.addr } }))
+    ok(await ao.load({ pid, data, fills: { BUNDLER: ar.addr } }))
   })
 
   it("should deploy weavedb process", async () => {
@@ -105,7 +105,7 @@ describe("WeaveDB", function () {
     )
     const { err, pid } = await ao.spwn({ module: opt.modules.aos2 })
     await ao.wait({ pid })
-    const { mid } = await ao.load({ pid, data, fills: { BUNDLER: ao.ar.addr } })
+    const { mid } = await ao.load({ pid, data, fills: { BUNDLER: ar.addr } })
 
     ok(
       await ao.msg({
@@ -218,7 +218,7 @@ describe("WeaveDB", function () {
       await ao.load({
         pid: pid2,
         data: data2,
-        fills: { BUNDLER: ao.ar.addr },
+        fills: { BUNDLER: ar.addr },
       }),
     )
     const { res: res2, out } = await ao.msg({
@@ -232,6 +232,7 @@ describe("WeaveDB", function () {
   })
 
   it("should deploy staking contract", async () => {
+    console.log(opt)
     const { p } = ok(await ao2.deploy({ src_data: src.data("staking2") }))
     await p.m("setup", { ts: 1, pool: 60, dur: 5 })
     await p.m("stake", { ts: 1, addr: "a", deposit: 2 })
@@ -246,7 +247,7 @@ describe("WeaveDB", function () {
     return
   })
 
-  it.only("should deploy staking contract", async () => {
+  it("should deploy staking contract", async () => {
     const infra = await ar.gen()
     const validator_1 = await ar.gen()
     const validator_2 = await ar.gen()
@@ -464,106 +465,25 @@ describe("WeaveDB", function () {
     await withdrawDB(5, infra.jwk)
     console.log(await stake.d("Balance", { Recipient: validator_1.addr }))
   })
-
-  it("should deploy tDB token and subledgers", async () => {
-    const data = readFileSync(
-      resolve(import.meta.dirname, "../contracts/tDB.lua"),
-      "utf8",
-    )
-    const { err, pid } = await ao2.spwn({
-      module: opt.modules.aos2,
-    })
-    await ao.wait({ pid })
-    const { mid } = await ao.load({ pid, data })
-
-    expect((await ao.dry({ pid, act: "Info", get: "Name" })).out).to.eql(
-      "Testnet DB",
-    )
-    await ao.msg({ pid, act: "Mint", tags: { Quantity: "100" } })
-    expect(
-      (await ao.dry({ pid, act: "Balances", get: true })).out[ao.ar.addr],
-    ).to.eql("100")
-
-    const data2 = readFileSync(
-      resolve(import.meta.dirname, "../contracts/weavedb_node_1.lua"),
-      "utf8",
-    )
-    const { pid: pid2 } = await ao.spwn({
-      module: opt.modules.aos2,
-      tags: { Authority: "XztbUZU7D8lAcWlbg0avCD0s2lMBbFGgTC4YzLcOR90" },
-    })
-    await ao.wait({ pid: pid2 })
-    const { mid: mid2 } = await ao.load({
-      pid: pid2,
-      data: data2,
+  it.only("should deploy tDB token and subledgers", async () => {
+    const { pid, p: tdb } = await ao2.deploy({ src_data: src.data("tDB") })
+    expect(await tdb.d("Info", "Name")).to.eql("Testnet DB")
+    await tdb.m("Mint", { Quantity: "100" })
+    expect((await tdb.d("Balances"))[ar.addr]).to.eql("100")
+    const { pid: pid2, p: node } = await ao2.deploy({
+      src_data: src.data("weavedb_node"),
       fills: { PARENT: pid, SOURCE: pid },
     })
-    console.log(
-      await ao.dry({
-        pid: pid2,
-        act: "Balances",
-        get: true,
-      }),
-    )
-
-    console.log("transfering....", ao.ar.addr)
-    console.log(
-      (
-        await ao.msg({
-          pid,
-          act: "Transfer",
-          tags: { Recipient: pid2, Quantity: "10" },
-        })
-      ).res.Messages[1],
-    )
-
+    await tdb.m("Transfer", { Recipient: pid2, Quantity: "10" })
     await wait(3000)
-    console.log(
-      await ao.dry({
-        pid: pid2,
-        act: "Balances",
-        get: true,
-      }),
-    )
-    return
-    console.log(
-      (
-        await ao.msg({
-          pid: pid2,
-          act: "Transfer",
-          tags: { Sender: ao.ar.addr, Recipient: pid2, Quantity: "5" },
-        })
-      ).res.Messages[0].Tags,
-    )
-    console.log(ao.ar.addr)
-    console.log(
-      await ao.dry({
-        pid: pid2,
-        act: "Balances",
-        get: true,
-      }),
-    )
-
-    await ao.msg({
-      pid: pid2,
-      act: "Withdraw",
-      tags: { Quantity: "3" },
+    await node.m("Transfer", {
+      Sender: ar.addr,
+      Recipient: pid2,
+      Quantity: "5",
     })
-
+    await node.m("Withdraw", { Quantity: "3" })
     await wait(3000)
-
-    expect(
-      (
-        await ao.dry({
-          pid: pid2,
-          act: "Balances",
-          get: true,
-        })
-      ).out[ao.ar.addr],
-    ).to.eql(2)
-
-    expect(
-      (await ao.dry({ pid, act: "Balances", get: true })).out[ao.ar.addr],
-    ).to.eql(93)
+    expect((await node.d("Balances"))[ar.addr]).to.eql("2")
+    expect((await tdb.d("Balances"))[ar.addr]).to.eql("93")
   })
 })

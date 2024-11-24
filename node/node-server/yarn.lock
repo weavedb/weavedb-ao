@@ -2998,10 +2998,10 @@ anymatch@~3.1.1, anymatch@~3.1.2:
     normalize-path "^3.0.0"
     picomatch "^2.0.4"
 
-aonote@^0.8.5:
-  version "0.8.5"
-  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.8.5.tgz#9e482ccb07706ae05c346fb7e825c001d57baa8b"
-  integrity sha512-CY0UFBJ0AO2Hl8x38b45YC7gYBLtCoD+rlGH5KC/0JR5ajZIdVc5nlYyGhc97KUi4W+cEyv9mIwU01sPgDje5Q==
+aonote@^0.10.1:
+  version "0.10.1"
+  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.10.1.tgz#ee58857ff52145080f9f4f187f1dec1e980f34cb"
+  integrity sha512-pgG+BV4Rea2HDBvKw7de94We2Aq9TLRimWRY3BEoSpInzCdH7DxIBhTF14vD5bTP1yqmlHeyg6Wy5EX3qWsD8A==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
     "@permaweb/aoconnect" "^0.0.61"
