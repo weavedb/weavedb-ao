@@ -148,7 +148,7 @@ class VM {
     this.conf.dbname ??= "weavedb"
     if (isNil(this.conf.bundler)) throw Error("bundler is not defined")
     if (isNil(this.conf.admin_contract))
-      throw Error("admin_contractr is not defined")
+      throw Error("admin_contract is not defined")
     if (isNil(this.conf.admin)) throw Error("admin is not defined")
     if (isNil(this.conf.rollups)) throw Error("rollups are not defined")
     this.admin = new Wallet(this.conf.admin)
@@ -414,18 +414,41 @@ class VM {
 
                   const ao = await new AO(this.conf.aos).init(this.conf.bundler)
                   const data = readFileSync(
-                    resolve(__dirname, "./lua/weavedb.lua"),
+                    //resolve(__dirname, "./lua/weavedb.lua"),
+                    resolve(__dirname, "../../lua/contracts/weavedb.lua"),
                     "utf8",
                   )
-
-                  const { pid } = await ao.spwn({ module, scheduler })
-                  console.log("spawned...", pid)
-                  await ao.wait({ pid })
-                  const { mid } = await ao.load({
-                    pid,
-                    data,
-                    fills: { BUNDLER: bundler },
+                  const { pid } = await ao.deploy({
+                    module,
+                    scheduler,
+                    src_data: data,
+                    fills: { BUNDLER: bundler, STAKING: this.conf.staking },
                   })
+                  console.log("deployed...", pid)
+                  const stake = ao.p(this.conf.staking)
+                  try {
+                    await stake.m(
+                      "Add-DB",
+                      {
+                        Allocations: {
+                          infra: "40",
+                          protocol: "10",
+                          validators: "40",
+                          [_db.owner]: "10",
+                        },
+                        Node: 1,
+                        DB: key,
+                        Price: 1,
+                        Process: pid,
+                        Validators: 2,
+                        "Min-Stake": 1,
+                      },
+                      { check: "db added!" },
+                    )
+                    console.log("db added to the staking process...")
+                  } catch (e) {
+                    console.log(e)
+                  }
                   const tx = await this.admin_db.update(
                     { contractTxId: pid, type: "ao", srcTxId: module },
                     "dbs",

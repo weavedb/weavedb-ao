@@ -24,10 +24,10 @@ class Test {
     weavedb_srcTxId,
     dbname,
     bundler,
+    staking,
     admin,
     admin_l1,
     network,
-    ao = false,
     cosmwasm = false,
     admin_contract,
   }) {
@@ -39,6 +39,7 @@ class Test {
     this.admin = admin
     this.admin_l1 = admin_l1
     this.bundler = bundler
+    this.staking = staking
     this.secure = secure
     this.weavedb_srcTxId = weavedb_srcTxId
     this.weavedb_version = weavedb_version ?? "0.42.1"
@@ -98,6 +99,7 @@ class Test {
       admin: this.admin.privateKey,
       admin_l1: this.admin_l1.privateKey,
       bundler: this.bundler,
+      staking: this.staking,
       rollups: {},
       contracts: this.contracts,
     }

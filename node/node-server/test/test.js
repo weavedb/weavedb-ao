@@ -5,10 +5,13 @@ const { wait, Test } = require("./lib/utils")
 const { readFileSync } = require("fs")
 const { resolve } = require("path")
 const { AO, AR } = require("aonote")
-const { setup, ok, fail } = require("./lib/helpers.js")
+const { Src, setup, ok, fail } = require("./lib/helpers.js")
 
 const getModule = async () => readFileSync(resolve(__dirname, "../contract.js"))
-
+const winston = "000000000000"
+const gewi = "000000000000000000"
+const w = n => Number(n).toString() + winston
+const g = n => Number(n).toString() + gewi
 describe("WeaveDB on AO", function () {
   this.timeout(0)
   let admin,
@@ -18,102 +21,78 @@ describe("WeaveDB on AO", function () {
     base,
     arweave,
     opt,
-    ao,
+    ao2,
+    node,
+    token,
+    ar,
+    src,
     admin_contract,
-    token
+    _stake,
+    stake,
+    eth,
+    _eth,
+    _db
 
   before(async () => {
-    ;({ ao, opt } = await setup({ cache: false }))
-    // testing in insecure mode, never do that in production
-    // deploy token
-    const data = readFileSync(
-      resolve(__dirname, "../../../lua/contracts/tDB.lua"),
-      "utf8",
-    )
-    const { err, pid } = await ao.spwn({})
-    ok(await ao.wait({ pid }))
-    const { mid } = await ao.load({ pid, data })
-    const data2 = readFileSync(
-      resolve(__dirname, "../../../lua/contracts/weavedb_node.lua"),
-      "utf8",
-    )
-
-    const { pid: pid2 } = await ao.spwn({})
-    ok(await ao.wait({ pid: pid2 }))
-
-    const { mid: mid2 } = await ao.load({
-      pid: pid2,
-      data: data2,
-      fills: { PARENT: pid, SOURCE: pid },
+    ;({ ar, ao2, opt } = await setup({}))
+    src = new Src({
+      ar,
+      dir: resolve(__dirname, "../../../lua/contracts"),
     })
-    admin_contract = pid2
-    token = pid
-
+    ;({ pid: _db, p: token } = await ao2.deploy({
+      src_data: await src.data("tDB"),
+    }))
+    ;({ pid: admin_contract, p: node } = await ao2.deploy({
+      fills: { PARENT: _db, SOURCE: _db },
+      src_data: await src.data("weavedb_node"),
+    }))
+    ;({ pid: _eth, p: eth } = await ao2.deploy({
+      src_data: await src.data("taoETH"),
+    }))
+    ;({ pid: _stake, p: stake } = ok(
+      await ao2.deploy({
+        src_data: src.data("staking"),
+        fills: { DB: _db, TOKEN: _eth },
+      }),
+    ))
     test = new Test({
-      admin_contract,
-      bundler: ao.ar.jwk,
-      aos: opt.ao,
-      secure: false,
-      sequencerUrl: "https://gw.warp.cc/",
-      apiKey: "xyz",
       ao: true,
+      secure: false,
+      staking: _stake,
+      admin_contract,
+      bundler: ar.jwk,
+      aos: opt.ao2,
     })
     ;({ network, arweave, bundler, admin, base } = await test.start())
     await wait(3000)
   })
 
   after(async () => await test.stop())
-  it("should deploy weavedb on AO", async () => {
-    const winston = "000000000000"
-    const ar = new AR(opt.ar)
-    const { addr } = await ar.gen()
-    ok(
-      await ao.msg({
-        pid: token,
-        act: "Mint",
-        tags: { Quantity: "10000" + winston },
-      }),
-    )
-    ok(
-      await ao.msg({
-        pid: token,
-        act: "Transfer",
-        tags: { Recipient: addr, Quantity: "1000" + winston },
-      }),
-    )
-    expect(
-      (
-        await ao.dry({
-          pid: token,
-          act: "Balances",
-          get: { data: true, json: true },
-        })
-      ).out[addr],
-    ).to.eql(("1000" + winston) * 1)
 
-    ok(
-      await ao.msg({
-        jwk: ar.jwk,
-        pid: token,
-        act: "Transfer",
-        tags: { Recipient: admin_contract, Quantity: "200" + winston },
-      }),
+  it("should deploy weavedb on AO", async () => {
+    const { addr, jwk } = await ar.gen()
+    await token.m("Mint", { Quantity: w(10000) })
+    await eth.m("Mint", { Quantity: g(10000) })
+    await eth.m(
+      "Transfer",
+      {
+        Recipient: _stake,
+        Quantity: 1,
+        "X-Action": "Add-Node",
+        "X-URL": "https://test.wdb.ae",
+      },
+      { check: /transferred/ },
+    )
+    await token.m("Transfer", { Recipient: addr, Quantity: w(1000) })
+    expect((await token.d("Balances"))[addr]).to.eql("1000" + winston)
+    await token.m(
+      "Transfer",
+      { Recipient: admin_contract, Quantity: w(200) },
+      { jwk },
     )
     await wait(3000)
-    expect(
-      (
-        await ao.dry({
-          pid: admin_contract,
-          act: "Balances",
-          get: { data: true, json: true },
-        })
-      ).out[addr],
-    ).to.eql(("200" + winston) * 1)
-
-    expect((await ao.dry({ pid: token, act: "Info", get: "Name" })).out).to.eql(
-      "Testnet DB",
-    )
-
+    expect((await node.d("Balances"))[addr]).to.eql("200" + winston)
+    expect(await node.d("Info", "Name")).to.eql("Testnet WDB")
     const db = new DB({
       rpc: "localhost:9090",
       contractTxId: "testdb",
@@ -121,25 +100,18 @@ describe("WeaveDB on AO", function () {
     })
     await wait(2000)
     const stats = await db.node({ op: "stats" })
-    expect(stats).to.eql({ dbs: [], bundler: ao.ar.addr })
-
+    expect(stats).to.eql({ dbs: [], bundler: ao2.ar.addr })
     // add a DB to node
     const tx = await db.admin(
       {
         op: "add_db",
         key: "testdb",
-        db: {
-          app: "http://localhost:3000",
-          name: "Jots",
-          rollup: true,
-          owner: addr,
-        },
+        db: { rollup: true, owner: addr },
       },
-      { ar2: ar.jwk },
+      { ar2: jwk },
     )
     expect(tx.success).to.eql(true)
 
-    console.log("aos2...", opt.modules.aos2)
     // deploy L1 AO contract (via node)
     const { contractTxId, srcTxId } = await db.admin(
       {
@@ -147,24 +119,20 @@ describe("WeaveDB on AO", function () {
         key: "testdb",
         type: "ao",
         module: opt.modules.aos2,
-        scheduler: opt.ao.scheduler,
+        scheduler: opt.ao2.scheduler,
       },
-      { ar2: ar.jwk },
+      { ar2: jwk },
     )
     expect((await db.node({ op: "stats" })).dbs[0].data.rollup).to.eql(true)
-
-    await wait(2000)
-
-    expect(
-      (
-        await ao.dry({
-          pid: admin_contract,
-          act: "Balances",
-          get: { data: true, json: true },
-        })
-      ).out[addr],
-    ).to.eql(("100" + winston) * 1)
-
+    await token.m("Transfer", {
+      Recipient: _stake,
+      Quantity: w(1000),
+      "X-Node": 1,
+      "X-DB": "testdb",
+    })
+    await wait(5000)
+    expect((await node.d("Balances"))[addr]).to.eql("100" + winston)
+    console.log((await stake.d("Get-Nodes"))["1"].dbs.testdb)
     // update the DB (via node)
     const db2 = new DB({ rpc: "localhost:9090", contractTxId })
     const Bob = { name: "Bob" }
@@ -173,15 +141,16 @@ describe("WeaveDB on AO", function () {
     })
     expect(tx2.success).to.eql(true)
     expect(await db2.get("ppl", "Bob")).to.eql(Bob)
+
     // check rollup
-    await wait(5000)
+    await wait(15000)
     expect(
       (
-        await ao.dry({
+        await ao2.dry({
           pid: contractTxId,
           act: "Get",
           tags: { Query: JSON.stringify(["ppl", "Bob"]) },
-          get: { data: true, json: true },
+          get: true,
         })
       ).out,
     ).to.eql(Bob)

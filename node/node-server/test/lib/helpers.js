@@ -1,17 +1,23 @@
 const { Note, Profile, AR, AO, Collection, Notebook } = require("aonote")
 const { expect } = require("chai")
+const { createDataItemSigner, connect } = require("@permaweb/aoconnect")
 const { resolve } = require("path")
 const { mkdirSync, existsSync, writeFileSync, readFileSync } = require("fs")
+const yargs = require("yargs")
+const {
+  reset = false,
+  cache = false,
+  auth = null,
+} = yargs(process.argv.slice(2)).argv
 
 class Src {
-  constructor({ ar, base = "../../lua", readFileSync, dir, resolve }) {
+  constructor({ ar, dir }) {
     this.ar = ar
-    this.base = base
-    this.dir = dir
+    this.dir = dir ?? resolve(__dirname)
   }
   data(file, ext = "lua") {
     return readFileSync(
-      resolve(this.dir, this.base, `${file}.${ext}`),
+      `${this.dir}/${file}.${ext}`,
       ext === "wasm" ? null : "utf8",
     )
   }
@@ -24,26 +30,38 @@ class Src {
 const setup = async ({
   aoconnect,
   arweave,
-  cache = false,
   cacheDir = ".cache",
+  targets = { profile: false, note: false, asset: false },
 } = {}) => {
+  if (targets.asset || targets.note) targets.profile = true
   let opt = null
   console.error = () => {}
   console.warn = () => {}
-  const dir = resolve(__dirname)
+  const dir = resolve(__dirname, "../../lua")
   const _cacheDir = resolve(__dirname, cacheDir)
   const optPath = `${_cacheDir}/opt.json`
-  if (cache) {
-    if (!existsSync(_cacheDir)) mkdirSync(_cacheDir)
-    if (existsSync(optPath)) opt = JSON.parse(readFileSync(optPath, "utf8"))
+  if (cache && !reset) {
+    try {
+      if (existsSync(optPath)) {
+        opt = JSON.parse(readFileSync(optPath, "utf8"))
+      } else {
+        console.log("cache doesn't exist:", optPath)
+      }
+    } catch (e) {
+      console.log(e)
+    }
   }
+
   if (opt) {
     const ar = await new AR(opt.ar).init(opt.jwk)
     const src = new Src({ ar, readFileSync, dir })
-    const ao = new AO({ ...opt.ao, ar })
-    const profile = new Profile({ ...opt.profile, ao })
-    return { opt, ar, ao, profile, src }
+    const ao2 = await new AO(opt.ao2).init(opt.jwk)
+    console.log("cache:\t", optPath)
+    console.log("addr:\t", ar.addr)
+    return { opt, ar, ao2, src }
   }
+
+  // ar
   arweave ??= { port: 4000 }
   aoconnect ??= {
     MU_URL: "http://localhost:4002",
@@ -53,28 +71,54 @@ const setup = async ({
   const ar = new AR(arweave)
   await ar.gen("10")
   const src = new Src({ ar, readFileSync, dir })
-  const wasm = await src.upload("aos", "wasm")
+  opt = { ar: { ...arweave }, jwk: ar.jwk }
+
+  // ao
+  const wasm2 = await src.upload("aos", "wasm")
   const wasm_aos2 = await src.upload("aos2_0_1", "wasm")
-  const ao = new AO({ aoconnect, ar })
+
+  const ao = new AO({ aoconnect, ar, authority: auth })
   const { id: module_aos2 } = await ao.postModule({
     data: await ar.data(wasm_aos2),
   })
+
+  const { id: module } = await ao.postModule({
+    data: await ar.data(wasm2),
+    overwrite: true,
+  })
+
   const { scheduler } = await ao.postScheduler({
     url: "http://su",
     overwrite: true,
   })
-  const { id: module } = await ao.postModule({
-    data: await ar.data(wasm),
-    overwrite: true,
-  })
-  opt = { ar: { ...arweave }, jwk: ar.jwk }
-  opt.ao = { module: module, scheduler, aoconnect, ar: opt.ar }
+
+  const ao2 = await new AO({
+    aoconnect,
+    ar,
+    authority: auth,
+    module: module_aos2,
+    scheduler,
+  }).init(ar.jwk)
+
+  opt.ao2 = {
+    module: module_aos2,
+    scheduler,
+    aoconnect,
+    ar: opt.ar,
+    authority: auth,
+  }
+
+  opt.authority = auth
+  opt.targets = targets
   opt.modules = {
     aos2: module_aos2,
     aos1: module,
   }
-  if (cache) writeFileSync(optPath, JSON.stringify(opt))
-  return { opt, ao, ar, src }
+  if (cache) {
+    if (!existsSync(_cacheDir)) mkdirSync(_cacheDir)
+    writeFileSync(optPath, JSON.stringify(opt))
+  }
+  return { opt, ar, src, ao2 }
 }
 
 const ok = obj => {
@@ -89,4 +133,9 @@ const fail = obj => {
   return obj
 }
 
-module.exports = { Src, setup, ok, fail }
+module.exports = {
+  setup,
+  ok,
+  fail,
+  Src,
+}

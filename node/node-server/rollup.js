@@ -220,7 +220,6 @@ class Rollup {
               })
             }
             if (this.type === "ao") {
-              const warp = new DB({ type: 3, contractTxId: this.contractTxId })
               let height = this.height
               let results = []
               let validity = {}
@@ -229,19 +228,6 @@ class Rollup {
               for (let v of b) {
                 const { bundles, hash, t } = v
                 _hash = hash
-                /*
-                const signed = await warp.sign(
-                  "bundle",
-                  map(_path(["data", "input"]))(bundles),
-                  {
-                    t,
-                    h: hash,
-                    n: ++height,
-                    parallel: true,
-                    nonce: 1,
-                    ar: this.bundler,
-                  },
-                )*/
                 const diffs = o(flatten, map(_path(["data", "diff"])))(bundles)
                 let _zkp = null
                 if (diffs.length > 0) {
@@ -257,7 +243,6 @@ class Rollup {
                     const col_id = this.cols[v.collection]
                     return [col_id, v.doc, v.data]
                   })
-                  console.log(txs)
                   _zkp = this.zkdb.tree.F.toObject(
                     this.zkdb.tree.root,
                   ).toString()
@@ -282,12 +267,11 @@ class Rollup {
                   hash,
                   zkdb: _zkp,
                 }
-                console.log(data)
                 const { err, mid } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
-                  data: JSON.stringify(data),
-                  checkData: "committed!",
+                  data,
+                  check: "committed!",
                 })
                 if (!err) {
                   results.push({
