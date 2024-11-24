@@ -1,5 +1,9 @@
 local json = require("json")
+
 data = data or {}
+cache = cache or {}
+block = block or 0
+
 init = init or false
 if bundler ~= '<BUNDLER>' then bundler = '<BUNDLER>' end
 if staking ~= '<STAKING>' then staking = '<STAKING>' end
@@ -438,7 +442,32 @@ Handlers.add(
   function(msg)
     assert(msg.From == bundler, "Only bundler can execute!");
     local _data = json.decode(msg.Data)
-    for i, v in ipairs(_data.diffs) do
+    assert(block < _data.block_height, "Invalid Block!");
+    cache[tostring(_data.block_height)] = cache[tostring(_data.block_height)] or {}
+    cache[tostring(_data.block_height)][msg.Id] = _data.diffs
+    
+    local result = Send({
+	TxID = msg.Id,
+	Target = staking,
+	Action = "Rollup",
+	Block = tostring(_data.block_height),
+	Txs = tostring(#_data.txs),
+    }).receive().Data
+    if result == "rolled up!" then
+      msg.reply({ Data = 'committed!' })
+    else
+      msg.reply({ Data = 'failed!'})
+    end
+  end
+)
+
+Handlers.add(
+  "Finalize",
+  "Finalize",
+  function(msg)
+    assert(msg.From == staking, "Only staking can execute!");
+    local _data = cache[msg["Block-Height"]][msg["TxID"]]
+    for i, v in ipairs(_data) do
       data[v.collection] = data[v.collection] or {}
       if v.op == "set" then
 	data[v.collection][v.doc] = v.data
@@ -451,22 +480,11 @@ Handlers.add(
 	end
       end
     end
-    local result = Send({
-	Target = staking,
-	Action = "Rollup",
-	Block = tostring(_data.block_height),
-	Txs = tostring(#_data.txs),
-	Hash = _data.hash,
-	["ZK-Root"] = _data.zkdb
-    }).receive().Data
-    if result == "rolled up!" then
-      msg.reply({ Data = 'committed!' })
-    else
-      msg.reply({ Data = 'failed!'})
-    end
+    block = tonumber(msg["Block-Height"])
+    cache[msg["Block-Height"]] = nil
+    msg.reply({ Data = 'finalized!' })
   end
 )
-
 
 Handlers.add(
   "Get",
