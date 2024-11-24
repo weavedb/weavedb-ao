@@ -110,6 +110,15 @@ Handlers.add(
 )
 
 Handlers.add(
+  "Get-Node",
+  "Get-Node",
+  function (msg)
+    assert(type(msg["Node"]) == 'string' and nodes[msg["Node"]] ~= nil, 'Valid Node is required!')
+    Send({ Target = msg.From, Data = json.encode(nodes[msg.Node] or nil) })
+  end
+)
+
+Handlers.add(
   "Get-DB",
   "Get-DB",
   function (msg)
@@ -220,9 +229,18 @@ Handlers.add(
     local info = nodes[msg["Node"]].dbs[msg["DB"]]
     assert(type(msg["DB"]) == 'string' and info ~= nil, 'Valid DB is required!')
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
-    local staked = nodes[msg["Node"]].dbs[msg["DB"]].stakes[msg.From] or "0"
-    assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
-    info.stakes[msg.From] = m.sub(staked, msg.Quantity)
+    local staked = "0"
+    if type(msg["Delegate-To"]) == "string" then
+      assert(isValidAddr(msg["Delegate-To"]), "Invalid Delegate-To address!")
+      staked = info.delegates[msg["Delegate-To"]][msg.From] or "0"
+      assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
+      info.delegates[msg["Delegate-To"]][msg.From] = m.sub(staked, msg.Quantity)
+    else
+      staked = info.stakes[msg.From] or "0"
+      assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
+      info.stakes[msg.From] = m.sub(staked, msg.Quantity)
+    end
+
     unstake(msg.From, msg.Quantity, msg.Timestamp)
     Send({
 	Target = aoETH,
