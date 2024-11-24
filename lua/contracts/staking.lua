@@ -281,8 +281,7 @@ Handlers.add(
   function (msg)
     local db = dbs[msg.From]
     assert(db ~= nil, 'DB does not exist!')
-    assert(type(msg.Hash) == "string", 'Hash is required!')
-    assert(type(msg["ZK-Root"]) == "string", 'ZK-Root is required!')
+    assert(type(msg.TxID) == "string" and isValidAddr(msg.TxID), 'TxID is required!')
     assert(bint.__lt(0, bint(msg.Block)), 'Block is required!')
     assert(bint.__lt(0, bint(msg.Txs)), 'Txs is required!')
     local info = nodes[db.node].dbs[db.db]
@@ -292,8 +291,7 @@ Handlers.add(
     assert(block ==  nil, 'Block already exists!')
     info.deposit = m.sub(info.deposit, price)
     db.blocks[msg.Block] = {
-      hash = msg.Hash,
-      zkroot = msg["ZK-Root"],
+      txid = msg.TxID,
       txs = msg.Txs,
       validators = {},
       validated_count = 0,
@@ -314,9 +312,7 @@ Handlers.add(
     local block = db.blocks[msg.Block]
     assert(block ~=  nil, 'Block does not exist!')
     assert(block.finalized ==  false, 'Block has been finalized!')
-    assert(type(msg.Hash) == "string" and msg.Hash == block.hash, 'Valid Hash is required!')
-    assert(type(msg["ZK-Root"]) == "string" and block.zkroot == msg["ZK-Root"],  'Valid ZK-Root is required!')
-    assert(bint.__lt(0, bint(msg.Txs)) and msg.Txs == block.txs, 'Valid Txs is required!')
+    assert(type(msg["TxID"]) == "string" and block.txid == msg["TxID"],  'Valid TxID is required!')
     local info = nodes[db.node].dbs[db.db]
     assert(bint.__le(bint(db.min), bint(info.stakes[msg.From])), 'Min Stake is required!')
     block.validators[msg.From] = true
@@ -369,6 +365,7 @@ Handlers.add(
       end
       Balances[admin] = m.add(Balances[admin], total)
       msg.reply({ Data = "finalized!" })
+      Send({ Target = msg.DB, Action = "Finalize", ["Block-Height"] = msg.Block, TxID = block.txid })
     end
     msg.reply({	Data = "validated!" })
   end

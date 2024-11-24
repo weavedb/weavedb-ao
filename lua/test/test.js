@@ -13,6 +13,7 @@ const beth = { name: "Beth", age: 20, favs: ["grape", "peach"] }
 const jeff = { name: "Jeff", age: 25, favs: ["apple", "peach"] }
 const david = { name: "David", age: 25, favs: ["lemon"] }
 const ppl = [bob, alice, mike, beth, jeff, david, beth, jeff, david, bob]
+const ppl2 = [bob, alice, mike, beth]
 
 const rmNull = obj => {
   for (let k in obj) {
@@ -98,73 +99,82 @@ describe("WeaveDB", function () {
     ok(await ao.load({ pid, data, fills: { BUNDLER: ar.addr } }))
   })
 
-  it("should deploy weavedb process", async () => {
-    const data = readFileSync(
-      resolve(import.meta.dirname, "../contracts/weavedb.lua"),
-      "utf8",
-    )
-    const { err, pid } = await ao.spwn({ module: opt.modules.aos2 })
-    await ao.wait({ pid })
-    const { mid } = await ao.load({ pid, data, fills: { BUNDLER: ar.addr } })
+  it.only("should deploy weavedb process", async () => {
+    const { pid: _stake, p: stake } = await ao2.deploy({
+      src_data: src.data("staking_mock"),
+    })
+    const { pid: _db, p: db } = await ao2.deploy({
+      src_data: src.data("weavedb"),
+      fills: { BUNDLER: ar.addr, STAKING: _stake },
+    })
 
-    ok(
-      await ao.msg({
-        pid,
-        act: "Rollup",
-        data: {
-          diffs: map(v => ({
-            collection: "ppl",
-            doc: v.name,
-            op: "set",
-            data: v,
-          }))(ppl),
-        },
-        check: "committed!",
-      }),
+    const { mid: mid1 } = await db.msg("Rollup", {
+      data: {
+        block_height: 1,
+        txs: ppl2,
+        diffs: map(v => ({
+          collection: "ppl",
+          doc: v.name,
+          op: "set",
+          data: v,
+        }))(ppl2),
+      },
+      check: "committed!",
+    })
+
+    const { mid: mid2 } = await db.msg("Rollup", {
+      data: {
+        block_height: 2,
+        txs: ppl2,
+        diffs: map(v => ({
+          collection: "ppl",
+          doc: v.name,
+          op: "delete",
+          data: null,
+        }))(ppl2),
+      },
+      check: "committed!",
+    })
+    const { mid: mid3 } = await db.msg("Rollup", {
+      data: {
+        block_height: 3,
+        txs: ppl2,
+        diffs: map(v => ({
+          collection: "ppl",
+          doc: v.name,
+          op: "update",
+          data: v,
+        }))(ppl2),
+      },
+      check: "committed!",
+    })
+    await stake.m(
+      "Finalize",
+      { to: _db, height: 1, txid: mid1 },
+      { check: "finalized!" },
     )
-    ok(
-      await ao.msg({
-        pid,
-        act: "Rollup",
-        data: {
-          diffs: map(v => ({
-            collection: "ppl",
-            doc: v.name,
-            op: "delete",
-            data: null,
-          }))(ppl),
-        },
-        check: "committed!",
-      }),
+    await stake.m(
+      "Finalize",
+      { to: _db, height: 2, txid: mid2 },
+      { check: "finalized!" },
+    )
+    await stake.m(
+      "Finalize",
+      { to: _db, height: 3, txid: mid3 },
+      { check: "finalized!" },
     )
 
-    ok(
-      await ao.msg({
-        pid,
-        act: "Rollup",
-        data: {
-          diffs: map(v => ({
-            collection: "ppl",
-            doc: v.name,
-            op: "update",
-            data: v,
-          }))(ppl),
-        },
-        check: "committed!",
-      }),
-    )
-
-    const q = async (...query) => {
+    const q = async (...Query) => {
       const get = true
-      const tags = { Query: JSON.stringify(query) }
-      return (await ao.dry({ pid, act: "Get", tags, get })).out
+      const tags = { Query: JSON.stringify(Query) }
+      return await db.d("Get", tags)
     }
-    const q2 = async (...query) => {
+    const q2 = async (...Query) => {
       const get = true
-      const tags = { Query: JSON.stringify(query) }
-      return (await ao.dry({ pid, act: "Parse", tags, get })).out
+      const tags = { Query: JSON.stringify(Query) }
+      return await db.d("Parse", tags)
     }
-
+    await wait(3000)
     const res = await q("ppl", "Bob")
     expect(res).to.eql(bob)
     expect(await q("ppl")).to.eql([alice, beth, bob, mike])
@@ -421,7 +431,7 @@ describe("WeaveDB", function () {
     await transfer(db, 100, 9900)
     await withdraw(2, 9, 1, validator_2.jwk)
     await delegate(validator_1.addr, 1, 9, _stake, delegator_1.jwk)
-    const out = await wdb.m("Rollup", {
+    const { mid, out } = await wdb.msg("Rollup", {
       jwk: infra.jwk,
       data: {
         hash: "abc",
@@ -441,31 +451,20 @@ describe("WeaveDB", function () {
 
     await stake.m(
       "Validate",
-      {
-        DB: _wdb,
-        Block: 1,
-        Txs: ppl.length.toString(),
-        Hash: "abc",
-        ["ZK-Root"]: "def",
-      },
+      { DB: _wdb, Block: 1, ["TxID"]: mid },
       { check: "validated!", jwk: validator_1.jwk },
     )
 
     await stake.m(
       "Validate",
-      {
-        DB: _wdb,
-        Block: 1,
-        Txs: ppl.length.toString(),
-        Hash: "abc",
-        ["ZK-Root"]: "def",
-      },
+      { DB: _wdb, Block: 1, ["TxID"]: mid },
       { check: "finalized!", jwk: validator_2.jwk },
     )
     await withdrawDB(5, infra.jwk)
     console.log(await stake.d("Balance", { Recipient: validator_1.addr }))
   })
-  it.only("should deploy tDB token and subledgers", async () => {
+
+  it("should deploy tDB token and subledgers", async () => {
     const { pid, p: tdb } = await ao2.deploy({ src_data: src.data("tDB") })
     expect(await tdb.d("Info", "Name")).to.eql("Testnet DB")
     await tdb.m("Mint", { Quantity: "100" })
