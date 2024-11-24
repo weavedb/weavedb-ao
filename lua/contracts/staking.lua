@@ -315,10 +315,11 @@ Handlers.add(
     assert(type(msg["TxID"]) == "string" and block.txid == msg["TxID"],  'Valid TxID is required!')
     local info = nodes[db.node].dbs[db.db]
     assert(bint.__le(bint(db.min), bint(info.stakes[msg.From])), 'Min Stake is required!')
+    assert(block.validators[msg.From] == nil, 'Already validated!')
     block.validators[msg.From] = true
     block.validated_count = block.validated_count + 1
     if block.validated_count == db.validators then
-      local price = m.mul(msg.Txs, info.price)
+      local price = m.mul(block.txs, info.price)
       block.finalized = true
       db.height = db.height + 1
       db.profit = m.add(db.profit, price)
@@ -363,9 +364,9 @@ Handlers.add(
 	  total = m.sub(total, v_reward)
 	end
       end
-      Balances[admin] = m.add(Balances[admin], total)
-      msg.reply({ Data = "finalized!" })
-      Send({ Target = msg.DB, Action = "Finalize", ["Block-Height"] = msg.Block, TxID = block.txid })
+	Balances[admin] = m.add(Balances[admin], total)
+	msg.reply({ Data = "finalized!" })
+	Send({ Target = msg.DB, Action = "Finalize", ["Block-Height"] = msg.Block, TxID = block.txid })
     end
     msg.reply({	Data = "validated!" })
   end

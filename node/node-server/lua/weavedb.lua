@@ -1,6 +1,12 @@
 local json = require("json")
+
 data = data or {}
+cache = cache or {}
+block = block or 0
+
+init = init or false
 if bundler ~= '<BUNDLER>' then bundler = '<BUNDLER>' end
+if staking ~= '<STAKING>' then staking = '<STAKING>' end
 
 local function err(message)
   error(message)
@@ -403,6 +409,23 @@ local function query_data(query)
 end
 
 Handlers.add(
+  "Init-DB",
+  "Init-DB",
+  function(msg)
+    assert(init == false, 'Already initialized!')
+    assert(msg.From == ao.env.Process.Owner, "Only owner can execute!");
+    assert(type(msg["Node"]) == 'string', 'Node is required!')
+    local isInit = Send({ Target = staking, Action = "Init-DB", Node = msg.Node }).receive().Data
+    if isInit == "initialized!" then
+      init = true
+      msg.reply({ Data = 'DB initialized!' })
+    else
+      msg.reply({ Data = 'DB not initialized!' })
+    end
+  end
+)
+
+Handlers.add(
   "Set-Bundler",
   "Set-Bundler",
   function(msg)
@@ -419,7 +442,31 @@ Handlers.add(
   function(msg)
     assert(msg.From == bundler, "Only bundler can execute!");
     local _data = json.decode(msg.Data)
-    for i, v in ipairs(_data.diffs) do
+    assert(block < _data.block_height, "Invalid Block!");
+    cache[tostring(_data.block_height)] = cache[tostring(_data.block_height)] or {}
+    cache[tostring(_data.block_height)][msg.Id] = _data.diffs
+    local result = Send({
+	TxID = msg.Id,
+	Target = staking,
+	Action = "Rollup",
+	Block = tostring(_data.block_height),
+	Txs = tostring(#_data.txs),
+    }).receive().Data
+    if result == "rolled up!" then
+      msg.reply({ Data = 'committed!' })
+    else
+      msg.reply({ Data = 'failed!'})
+    end
+  end
+)
+
+Handlers.add(
+  "Finalize",
+  "Finalize",
+  function(msg)
+    assert(msg.From == staking, "Only staking can execute!");
+    local _data = cache[msg["Block-Height"]][msg["TxID"]]
+    for i, v in ipairs(_data) do
       data[v.collection] = data[v.collection] or {}
       if v.op == "set" then
 	data[v.collection][v.doc] = v.data
@@ -432,10 +479,11 @@ Handlers.add(
 	end
       end
     end
-    msg.reply({ Data = 'committed!'})
+    block = tonumber(msg["Block-Height"])
+    cache[msg["Block-Height"]] = nil
+    msg.reply({ Data = 'finalized!' })
   end
 )
-
 
 Handlers.add(
   "Get",
@@ -463,5 +511,18 @@ Handlers.add(
     local query = json.decode(msg.Tags.Query)
     local q = _parser(query)
     msg.reply({ Data = json.encode(q) })
+  end
+)
+
+Handlers.add(
+  "Get-Next-Block",
+  "Get-Next-Block",
+  function(msg)
+    msg.reply({
+	Data = json.encode({
+	    height = block + 1,
+	    candidates = cache[tostring(block + 1)] or {}
+	})
+    })
   end
 )
