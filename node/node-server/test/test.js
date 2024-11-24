@@ -133,8 +133,7 @@ describe("WeaveDB on AO", function () {
     await token.m("Transfer", {
       Recipient: _stake,
       Quantity: w(1000),
-      "X-Node": 1,
-      "X-DB": "testdb",
+      "X-DB": contractTxId,
     })
     await wait(5000)
     expect((await node.d("Balances"))[addr]).to.eql("100" + winston)
@@ -153,8 +152,7 @@ describe("WeaveDB on AO", function () {
       {
         Recipient: _stake,
         Quantity: 1,
-        "X-Node": 1,
-        "X-DB": "testdb",
+        "X-DB": contractTxId,
       },
       { check: /transferred/, jwk: validator_1.jwk },
     )
@@ -163,8 +161,7 @@ describe("WeaveDB on AO", function () {
       {
         Recipient: _stake,
         Quantity: 1,
-        "X-Node": 1,
-        "X-DB": "testdb",
+        "X-DB": contractTxId,
       },
       { check: /transferred/, jwk: validator_2.jwk },
     )
