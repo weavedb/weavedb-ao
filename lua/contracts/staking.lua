@@ -47,16 +47,6 @@ function isValidAddr(address)
   return string.match(address, "^[A-Za-z0-9_-]+$") ~= nil and #address == 43
 end
 
-Handlers.add(
-  "Add-Node",
-  "Add-Node",
-  function (msg)
-    assert(type(msg.URL) == 'string', 'URL is required!')
-    count = count + 1
-    nodes[tostring(count)] = { url = msg.URL, admin = msg.From, dbs = {} }
-    msg.reply({ Data = "node added!" })
-  end
-)
 
 Handlers.add(
   "Add-DB",
@@ -65,20 +55,12 @@ Handlers.add(
     assert(type(msg.Node) == 'string' and nodes[msg.Node] ~= nil, 'Valid Node is required!')
     assert(type(msg.Allocations) == 'string', 'Allocations is required!')
     assert(nodes[msg.Node].admin == msg.From, 'Only node admin can execute!')
-    assert(type(msg.DB) == 'string', 'DB is required!')
-    assert(type(msg.Process) == 'string' and isValidAddr(msg.Process), 'Valid Process is required!')
+    assert(type(msg.DB) == 'string' and isValidAddr(msg.DB), 'Valid DB is required!')
     assert(bint.__lt(0, bint(msg.Price)), 'Price must be greater than 0')
     assert(bint.__lt(0, bint(msg.Validators)), 'Validators must be greater than 0')
     assert(bint.__lt(0, bint(msg["Min-Stake"])), 'Min-Stake must be greater than 0')
     assert(nodes[msg.Node].dbs[msg.DB] == nil, 'DB already exists!')
-    nodes[msg.Node].dbs[msg.DB] = {
-      stakes = {},
-      delegates = {},
-      stake = "0",
-      deposit = "0",
-      price = msg.Price,
-      process = msg.Process
-    }
+    nodes[msg.Node].dbs[msg.DB] = { process = msg.DB }
     local allocations = json.decode(msg.Allocations)
     for k, v in pairs(allocations) do
       assert(bint.__lt(0, bint(v)), 'alloc must be greater than 0')
@@ -86,9 +68,13 @@ Handlers.add(
 	assert(false, 'invalid allocation address')
       end
     end
-    dbs[msg.Process] = {
+    dbs[msg.DB] = {
+      delegates = {},
+      stakes = {},
+      price = msg.Price,
+      stake = "0",
+      deposit = "0",
       allocations = allocations,
-      init = false,
       db = msg.DB,
       node = msg.Node,
       height = 0,
@@ -175,22 +161,21 @@ Handlers.add(
 	TotalStake = m.add(TotalStake, msg.Quantity)
 	msg.reply({ Data = "node added!" })
       else
-	assert(type(msg["X-Node"]) == 'string' and nodes[msg["X-Node"]] ~= nil, 'Valid Node is required!')
-	local info = nodes[msg["X-Node"]].dbs[msg["X-DB"]]
-	assert(type(msg["X-DB"]) == 'string' and info ~= nil, 'Valid DB is required!')
+	assert(type(msg["X-DB"]) == 'string' and dbs[msg["X-DB"]] ~= nil, 'Valid DB is required!')
+	local db = dbs[msg["X-DB"]]
 	if msg["X-Action"] == "Delegate" then
 	  local to = msg["X-Delegate-To"]
-	  assert(type(to) == 'string' and info.delegates[to] ~= nil, 'Valid Delegate-To is required!')
-	  info.delegates[to][msg.Sender] = info.delegates[to][msg.Sender] or "0"
-	  info.delegates[to][msg.Sender] = m.add(info.delegates[to][msg.Sender], msg.Quantity)
+	  assert(type(to) == 'string' and db.delegates[to] ~= nil, 'Valid Delegate-To is required!')
+	  db.delegates[to][msg.Sender] = db.delegates[to][msg.Sender] or "0"
+	  db.delegates[to][msg.Sender] = m.add(db.delegates[to][msg.Sender], msg.Quantity)
 	  stake(msg.Sender, msg.Quantity, msg.Timestamp)
 	else
-	  info.stakes[msg.Sender] = info.stakes[msg.Sender] or "0"
-	  info.delegates[msg.Sender] = info.delegates[msg.Sender] or {}
-	  info.stakes[msg.Sender] = m.add(info.stakes[msg.Sender], msg.Quantity)
+	  db.stakes[msg.Sender] = db.stakes[msg.Sender] or "0"
+	  db.delegates[msg.Sender] = db.delegates[msg.Sender] or {}
+	  db.stakes[msg.Sender] = m.add(db.stakes[msg.Sender], msg.Quantity)
 	  stake(msg.Sender, msg.Quantity, msg.Timestamp)
 	end
-	info.stake = m.add(info.stake, msg.Quantity)
+	db.stake = m.add(db.stake, msg.Quantity)
 	TotalStake = m.add(TotalStake, msg.Quantity)
 	msg.reply({ Data = "staked!" })
       end
@@ -209,8 +194,9 @@ Handlers.add(
 	  stakes = {}
 	}
 	msg.reply({ Data = "reward set!" })
-      elseif type(msg["X-Node"]) == 'string' and nodes[msg["X-Node"]] ~= nil and type(msg["X-DB"]) == 'string' and nodes[msg["X-Node"]].dbs[msg["X-DB"]] ~= nil then
-	nodes[msg["X-Node"]].dbs[msg["X-DB"]].deposit = m.add(nodes[msg["X-Node"]].dbs[msg["X-DB"]].deposit, msg.Quantity)
+      elseif type(msg["X-DB"]) == 'string' and dbs[msg["X-DB"]] ~= nil then
+	local db = dbs[msg["X-DB"]]
+	db.deposit = m.add(db.deposit, msg.Quantity)
 	TotalDeposit = m.add(TotalDeposit, msg.Quantity)
 	msg.reply({ Data = "depositted!" })
       else
@@ -225,20 +211,19 @@ Handlers.add(
   "Withdraw",
   "Withdraw",
   function (msg)
-    assert(type(msg["Node"]) == 'string' and nodes[msg["Node"]] ~= nil, 'Valid Node is required!')
-    local info = nodes[msg["Node"]].dbs[msg["DB"]]
-    assert(type(msg["DB"]) == 'string' and info ~= nil, 'Valid DB is required!')
+    assert(type(msg["DB"]) == 'string' and dbs[msg["DB"]] ~= nil, 'Valid DB is required!')
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    local db = dbs[msg["DB"]]
     local staked = "0"
     if type(msg["Delegate-To"]) == "string" then
       assert(isValidAddr(msg["Delegate-To"]), "Invalid Delegate-To address!")
-      staked = info.delegates[msg["Delegate-To"]][msg.From] or "0"
+      staked = db.delegates[msg["Delegate-To"]][msg.From] or "0"
       assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
-      info.delegates[msg["Delegate-To"]][msg.From] = m.sub(staked, msg.Quantity)
+      db.delegates[msg["Delegate-To"]][msg.From] = m.sub(staked, msg.Quantity)
     else
-      staked = info.stakes[msg.From] or "0"
+      staked = db.stakes[msg.From] or "0"
       assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
-      info.stakes[msg.From] = m.sub(staked, msg.Quantity)
+      db.stakes[msg.From] = m.sub(staked, msg.Quantity)
     end
 
     unstake(msg.From, msg.Quantity, msg.Timestamp)
@@ -249,7 +234,7 @@ Handlers.add(
 	Quantity = msg.Quantity
     })
     TotalStake = m.sub(TotalStake, msg.Quantity)
-    info.stake = m.sub(info.stake, msg.Quantity)
+    db.stake = m.sub(db.stake, msg.Quantity)
     msg.reply({ Data = "withdrew!" })
   end
 )
@@ -303,11 +288,11 @@ Handlers.add(
     assert(bint.__lt(0, bint(msg.Block)), 'Block is required!')
     assert(bint.__lt(0, bint(msg.Txs)), 'Txs is required!')
     local info = nodes[db.node].dbs[db.db]
-    local price = m.mul(msg.Txs, info.price)
-    assert(bint.__le(bint(price), bint(info.deposit)), 'Deposit is not enough!')
+    local price = m.mul(msg.Txs, db.price)
+    assert(bint.__le(bint(price), bint(db.deposit)), 'Deposit is not enough!')
     local block = db.blocks[msg.Block]
     assert(block ==  nil, 'Block already exists!')
-    info.deposit = m.sub(info.deposit, price)
+    db.deposit = m.sub(db.deposit, price)
     db.blocks[msg.Block] = {
       txid = msg.TxID,
       txs = msg.Txs,
@@ -332,12 +317,12 @@ Handlers.add(
     assert(block.finalized ==  false, 'Block has been finalized!')
     assert(type(msg["TxID"]) == "string" and block.txid == msg["TxID"],  'Valid TxID is required!')
     local info = nodes[db.node].dbs[db.db]
-    assert(bint.__le(bint(db.min), bint(info.stakes[msg.From])), 'Min Stake is required!')
+    assert(bint.__le(bint(db.min), bint(db.stakes[msg.From])), 'Min Stake is required!')
     assert(block.validators[msg.From] == nil, 'Already validated!')
     block.validators[msg.From] = true
     block.validated_count = block.validated_count + 1
     if block.validated_count == db.validators then
-      local price = m.mul(block.txs, info.price)
+      local price = m.mul(block.txs, db.price)
       block.finalized = true
       db.height = db.height + 1
       db.profit = m.add(db.profit, price)
@@ -363,8 +348,8 @@ Handlers.add(
 	end
 	end
       for k, v in pairs(block.validators) do
-	validator_total = m.add(validator_total, info.stakes[k])
-	for k2, v2 in pairs(info.delegates[k]) do
+	validator_total = m.add(validator_total, db.stakes[k])
+	for k2, v2 in pairs(db.delegates[k]) do
 	  validator_total = m.add(validator_total, v2)
 	end
       end
@@ -372,10 +357,10 @@ Handlers.add(
       Balances[admin] = Balances[admin] or "0"
       for k, v in pairs(block.validators) do
 	Balances[k] = Balances[k] or "0"
-	local v_reward = m.div(m.mul(reward_base, info.stakes[k]), validator_total)
+	local v_reward = m.div(m.mul(reward_base, db.stakes[k]), validator_total)
 	Balances[k] = m.add(Balances[k], v_reward)
 	total = m.sub(total, v_reward)
-	for k2, v2 in pairs(info.delegates[k]) do
+	for k2, v2 in pairs(db.delegates[k]) do
 	  Balances[k2] = Balances[k2] or "0"
 	  local v_reward = m.div(m.mul(reward_base, v2), validator_total)
 	  Balances[k2] = m.add(Balances[k2], v_reward)
@@ -415,19 +400,5 @@ Handlers.add(
   "Balances",
   function(msg) 
     msg.reply({ Data = json.encode(Balances) })
-  end
-)
-
-Handlers.add(
-  'Init-DB',
-  "Init-DB",
-  function(msg)
-    assert(type(msg["Node"]) == 'string' and nodes[msg["Node"]] ~= nil, 'Valid Node is required!')
-    local db = dbs[msg.From]
-    assert(db ~= nil, 'DB does not exist!')
-    assert(db.node == msg["Node"], 'The wrong node!')
-    assert(db.init == false, "Already initialized!")
-    db.init = true
-    msg.reply({ Data = "initialized!" })
   end
 )

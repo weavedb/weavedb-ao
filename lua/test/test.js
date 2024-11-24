@@ -288,11 +288,12 @@ describe("WeaveDB", function () {
       expect((await p.d("Balances"))[tar]).to.eql(Number(qty).toString())
     }
     const getNodes = async () => await stake.d("Get-Nodes")
+    const getDB = async () => await stake.d("Get-DB", { DB: _wdb })
 
     const stakeBal = async (qty, tar) => {
       tar ??= ar.addr
-      const out = await getNodes()
-      expect(out["1"].dbs.demo.stakes[tar]).to.eql(Number(qty).toString())
+      const out = await getDB()
+      expect(out.stakes[tar]).to.eql(Number(qty).toString())
     }
 
     const mint = async (p, qty, exp, jwk) => {
@@ -306,8 +307,7 @@ describe("WeaveDB", function () {
         {
           Recipient: to,
           Quantity: qty,
-          "X-Node": 1,
-          "X-DB": "demo",
+          "X-DB": _wdb,
         },
         { check: /transferred/, jwk },
       )
@@ -319,8 +319,7 @@ describe("WeaveDB", function () {
         {
           Recipient: to,
           Quantity: qty,
-          "X-Node": 1,
-          "X-DB": "demo",
+          "X-DB": _wdb,
           "X-Action": "Delegate",
           "X-Delegate-To": who,
         },
@@ -353,7 +352,7 @@ describe("WeaveDB", function () {
     const withdraw = async (qty, exp, exp_stake, jwk) => {
       await stake.m(
         "Withdraw",
-        { Quantity: qty, Node: 1, DB: "demo" },
+        { Quantity: qty, DB: _wdb },
         { check: /withdrew/, jwk },
       )
       if (!isNil(exp)) await bal(eth, exp, jwk ? await ar.toAddr(jwk) : null)
@@ -396,22 +395,22 @@ describe("WeaveDB", function () {
       await stake.m(
         "Add-DB",
         {
+          Node: 1,
           Allocations: {
             infra: "40",
             protocol: "10",
             validators: "40",
             [delegator_2.addr]: "10",
           },
-          Node: 1,
-          DB: "demo",
           Price: 1,
-          Process: _wdb,
+          DB: _wdb,
           Validators: 2,
           "Min-Stake": 1,
         },
         { jwk: infra.jwk, check: "db added!" },
       )
     }
+
     await mint(db, 20000, 20000)
     await setReward(10000, 10000)
     const start = Date.now()
@@ -423,8 +422,6 @@ describe("WeaveDB", function () {
     await send(eth, 10, 50, delegator_2.addr)
     await addNode()
     await addDB()
-    await wdb.m("Init-DB", { Node: 1 }, { check: "DB initialized!" })
-    expect((await stake.d("Get-DB", { DB: _wdb })).init).to.eql(true)
     await transfer(eth, 1, 9, _stake, validator_1.jwk)
     await transfer(eth, 3, 7, _stake, validator_2.jwk)
     await transfer(db, 100, 9900)
@@ -462,11 +459,11 @@ describe("WeaveDB", function () {
     await withdrawDB(5, infra.jwk)
     await stake.m(
       "Withdraw",
-      { DB: "demo", Node: "1", "Delegate-To": validator_1.addr, Quantity: "1" },
+      { DB: _wdb, "Delegate-To": validator_1.addr, Quantity: "1" },
       { jwk: delegator_1.jwk },
     )
     await wait(2000)
-    expect(await eth.d("Balance", { Recipient: delegator_1.addr })).to.eql("10")
+    expect(await eth.d("Balance", { Recipient: delegator_1.addr })).to.eql(10)
   })
 
   it("should deploy tDB token and subledgers", async () => {
