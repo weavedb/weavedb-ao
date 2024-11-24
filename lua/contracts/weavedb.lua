@@ -445,7 +445,6 @@ Handlers.add(
     assert(block < _data.block_height, "Invalid Block!");
     cache[tostring(_data.block_height)] = cache[tostring(_data.block_height)] or {}
     cache[tostring(_data.block_height)][msg.Id] = _data.diffs
-    
     local result = Send({
 	TxID = msg.Id,
 	Target = staking,
@@ -512,5 +511,18 @@ Handlers.add(
     local query = json.decode(msg.Tags.Query)
     local q = _parser(query)
     msg.reply({ Data = json.encode(q) })
+  end
+)
+
+Handlers.add(
+  "Get-Next-Block",
+  "Get-Next-Block",
+  function(msg)
+    msg.reply({
+	Data = json.encode({
+	    height = block + 1,
+	    candidates = cache[tostring(block + 1)] or {}
+	})
+    })
   end
 )

@@ -414,8 +414,8 @@ class VM {
 
                   const ao = await new AO(this.conf.aos).init(this.conf.bundler)
                   const data = readFileSync(
-                    //resolve(__dirname, "./lua/weavedb.lua"),
-                    resolve(__dirname, "../../lua/contracts/weavedb.lua"),
+                    resolve(__dirname, "./lua/weavedb.lua"),
+                    //resolve(__dirname, "../../lua/contracts/weavedb.lua"),
                     "utf8",
                   )
                   const { pid } = await ao.deploy({
