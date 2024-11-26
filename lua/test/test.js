@@ -23,6 +23,10 @@ const rmNull = obj => {
 }
 
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
+const winston = "000000000000"
+const gewi = "000000000000000000"
+const w = n => Number(n).toString() + winston
+const g = n => Number(n).toString() + gewi
 
 async function deriveEntropyForRSA(prfKey) {
   const hkdfKeyMaterial = await crypto.subtle.importKey(
@@ -383,7 +387,7 @@ describe("WeaveDB", function () {
         "Transfer",
         {
           Recipient: _stake,
-          Quantity: 1,
+          Quantity: g(1),
           "X-Action": "Add-Node",
           "X-URL": "https://test.wdb.ae",
         },
@@ -402,7 +406,7 @@ describe("WeaveDB", function () {
             validators: "40",
             [delegator_2.addr]: "10",
           },
-          Price: 1,
+          Price: w(1),
           DB: _wdb,
           Validators: 2,
           "Min-Stake": 1,
@@ -410,23 +414,21 @@ describe("WeaveDB", function () {
         { jwk: infra.jwk, check: "db added!" },
       )
     }
-
-    await mint(db, 20000, 20000)
-    await setReward(10000, 10000)
-    const start = Date.now()
-    await mint(eth, 100, 100)
-    await send(eth, 10, 90, infra.addr)
-    await send(eth, 10, 80, validator_1.addr)
-    await send(eth, 10, 70, validator_2.addr)
-    await send(eth, 10, 60, delegator_1.addr)
-    await send(eth, 10, 50, delegator_2.addr)
+    await mint(db, w(20000), w(20000))
+    await setReward(w(10000), w(10000))
+    await mint(eth, g(100), g(100))
+    await send(eth, g(10), g(90), infra.addr)
+    await send(eth, g(10), g(80), validator_1.addr)
+    await send(eth, g(10), g(70), validator_2.addr)
+    await send(eth, g(10), g(60), delegator_1.addr)
+    await send(eth, g(10), g(50), delegator_2.addr)
     await addNode()
     await addDB()
-    await transfer(eth, 1, 9, _stake, validator_1.jwk)
-    await transfer(eth, 3, 7, _stake, validator_2.jwk)
-    await transfer(db, 100, 9900)
-    await withdraw(2, 9, 1, validator_2.jwk)
-    await delegate(validator_1.addr, 1, 9, _stake, delegator_1.jwk)
+    await transfer(eth, g(1), g(9), _stake, validator_1.jwk)
+    await transfer(eth, g(3), g(7), _stake, validator_2.jwk)
+    await transfer(db, w(100), w(9900))
+    await withdraw(g(2), g(9), g(1), validator_2.jwk)
+    await delegate(validator_1.addr, g(1), g(9), _stake, delegator_1.jwk)
     const { mid, out } = await wdb.msg("Rollup", {
       jwk: infra.jwk,
       data: {
@@ -456,14 +458,17 @@ describe("WeaveDB", function () {
       { DB: _wdb, Block: 1, ["TxID"]: mid },
       { check: "finalized!", jwk: validator_2.jwk },
     )
-    await withdrawDB(5, infra.jwk)
+    await withdrawDB(null, infra.jwk)
+    await withdrawDB(null, validator_1.jwk)
     await stake.m(
       "Withdraw",
-      { DB: _wdb, "Delegate-To": validator_1.addr, Quantity: "1" },
+      { DB: _wdb, "Delegate-To": validator_1.addr, Quantity: g(1) },
       { jwk: delegator_1.jwk },
     )
     await wait(2000)
-    expect(await eth.d("Balance", { Recipient: delegator_1.addr })).to.eql(10)
+    expect(await eth.d("Balance", { Recipient: delegator_1.addr })).to.eql(
+      g(10) * 1,
+    )
   })
 
   it("should deploy tDB token and subledgers", async () => {

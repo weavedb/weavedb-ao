@@ -1424,12 +1424,13 @@
     ramda "^0.30.0"
     zod "^3.23.5"
 
-"@permaweb/aoconnect@^0.0.59":
-  version "0.0.59"
-  resolved "https://registry.yarnpkg.com/@permaweb/aoconnect/-/aoconnect-0.0.59.tgz#0ceb6257e2f376f4af6783163e3037240560dff1"
-  integrity sha512-AgnUv50hp3BVvqWk2IOw3p9ksF2GblFwQHCIWqwTYjvdViCPlsL4gx/BefxFqbMABXQ5q2QJItMJLlPelqC2CQ==
+"@permaweb/aoconnect@^0.0.61":
+  version "0.0.61"
+  resolved "https://registry.yarnpkg.com/@permaweb/aoconnect/-/aoconnect-0.0.61.tgz#471afcd99a528b25407567cfdfe582df9e30fc7d"
+  integrity sha512-qFIFG29pL7+SUEgW/jHeA4GCuz89XOh5abrsRS8l3dASk6OX00mqMlDT9zJcuewxu21HeDwTW2bO230rvdzGQQ==
   dependencies:
     "@permaweb/ao-scheduler-utils" "~0.0.23"
+    "@permaweb/protocol-tag-utils" "~0.0.2"
     buffer "^6.0.3"
     debug "^4.3.6"
     hyper-async "^1.1.2"
@@ -1437,6 +1438,11 @@
     ramda "^0.30.1"
     warp-arbundles "^1.0.4"
     zod "^3.23.8"
+
+"@permaweb/protocol-tag-utils@~0.0.2":
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/@permaweb/protocol-tag-utils/-/protocol-tag-utils-0.0.2.tgz#c8a2eddf7da15d70a6e60aecff839730cb59aee3"
+  integrity sha512-2IiKu71W7pkHKIzxabCGQ5q8DSppZaE/sPcPF2hn+OWwfe04M7b5X5LHRXQNPRuxHWuioieGdPQb3F7apOlffQ==
 
 "@pkgjs/parseargs@^0.11.0":
   version "0.11.0"
@@ -2386,13 +2392,13 @@ ansicolors@^0.3.2, ansicolors@~0.3.2:
   resolved "https://registry.yarnpkg.com/ansicolors/-/ansicolors-0.3.2.tgz#665597de86a9ffe3aa9bfbe6cae5c6ea426b4979"
   integrity sha512-QXu7BPrP29VllRxH8GwB7x5iX5qWKAAMLqKQGWTeLWVlNHNOpVMJ91dsxQAIWXpjuW5wqvxu3Jd/nRjrJ+0pqg==
 
-aonote@^0.8.4:
-  version "0.8.4"
-  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.8.4.tgz#1284fa46266b37a0b18eb22292341baef56bda68"
-  integrity sha512-ZV4QBiuacZD5aUg+MJN03vKIIIhc/u2kpjTBJ2Fk8afOp1PJjwQjLa9Ax9rEzZmaOVnqgicIWpoGY/hRhgrhcw==
+aonote@^0.10.1:
+  version "0.10.1"
+  resolved "https://registry.yarnpkg.com/aonote/-/aonote-0.10.1.tgz#ee58857ff52145080f9f4f187f1dec1e980f34cb"
+  integrity sha512-pgG+BV4Rea2HDBvKw7de94We2Aq9TLRimWRY3BEoSpInzCdH7DxIBhTF14vD5bTP1yqmlHeyg6Wy5EX3qWsD8A==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
-    "@permaweb/aoconnect" "^0.0.59"
+    "@permaweb/aoconnect" "^0.0.61"
     arbundles "^0.11.1"
     arweave "^1.15.1"
     ramda "^0.30.1"

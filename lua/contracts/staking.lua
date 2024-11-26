@@ -3,7 +3,7 @@ local bint = require('.bint')(256)
 
 if aoETH ~= '<TOKEN>' then aoETH = '<TOKEN>' end
 if dbToken ~= '<DB>' then dbToken = '<DB>' end
-
+local ten16 = "10000000000000000"
 local m = {
   add = function(a, b)
     return tostring(bint(a) + bint(b))
@@ -37,7 +37,9 @@ count = count or 0
 dbs = dbs or {}
 profits = profits or {}
 Balances = Balances or { [ao.id] = "0" }
-minETH = "1"
+Withdraws = Withdraws or { [ao.id] = "0" }
+RewardWithdraws = RewardWithdraws or { [ao.id] = "0" }
+minETH = "1000000000000000000"
 rewards = rewards or nil
 TotalStake = TotalStake or "0"
 TotalDeposit = TotalDeposit or "0"
@@ -76,6 +78,7 @@ Handlers.add(
       deposit = "0",
       allocations = allocations,
       db = msg.DB,
+      txs = 0,
       node = msg.Node,
       height = 0,
       profit = "0",
@@ -113,11 +116,19 @@ Handlers.add(
   end
 )
 
+Handlers.add(
+  "Get-DBs",
+  "Get-DBs",
+  function (msg)
+    Send({ Target = msg.From, Data = json.encode(dbs) })
+  end
+)
+
 local getStakes = function (addr, deposit, timestamp, unstake)
   local deadline = m.add(rewards.duration, rewards.start)
   if bint.__le(bint(deadline), bint(timestamp)) then timestamp = deadline end
   local r = m.div(m.mul(rewards.pool, m.sub(timestamp, rewards.ts)), rewards.duration)
-  if bint(rewards.total) > 0 then rewards.k = m.add(rewards.k, m.div(r, rewards.total)) end
+  if bint(rewards.total) > 0 then rewards.k = m.add(rewards.k, m.div(r, m.div(rewards.total, ten16))) end
   rewards.stakes[addr] = rewards.stakes[addr] or { amount = 0, k = rewards.k, bal = 0 }
   rewards.ts = timestamp
   local amount = "0"
@@ -126,14 +137,36 @@ local getStakes = function (addr, deposit, timestamp, unstake)
   else
     amount = rewards.stakes[addr].amount
   end
-  local reward = m.mul(amount,  (m.sub(rewards.k, rewards.stakes[addr].k)))
+  local reward = m.mul(
+    m.div(amount, ten16),
+    m.sub(rewards.k, rewards.stakes[addr].k)
+  )
   rewards.stakes[addr].bal = m.add(rewards.stakes[addr].bal, reward)
+  rewards.stakes[addr].k = rewards.k
+end
+
+local getStakes2 = function (addr, timestamp, unstake)
+  local deadline = m.add(rewards.duration, rewards.start)
+  if bint.__le(bint(deadline), bint(timestamp)) then timestamp = deadline end
+  local r = m.div(m.mul(rewards.pool, m.sub(timestamp, rewards.ts)), rewards.duration)
+  local k = rewards.k
+  if bint(rewards.total) > 0 then k = m.add(rewards.k, m.div(r, m.div(rewards.total, ten16))) end
+  local amount = "0"
+  local k2 = k
+  local bal = "0"
+  if rewards.stakes[addr] ~= nil then
+    amount = rewards.stakes[addr].amount
+    k2 = rewards.stakes[addr].k
+    bal = rewards.stakes[addr].bal
+  end
+
+  local reward = m.mul( m.div(amount, ten16), m.sub(k, k2))
+  return m.add(bal, reward)
 end
 
 local stake = function(addr, deposit, timestamp)
   getStakes(addr, deposit, timestamp)
   rewards.stakes[addr].amount = m.add(rewards.stakes[addr].amount, deposit)
-  rewards.stakes[addr].k = rewards.k
   rewards.total = m.add(rewards.total, deposit)
 end
 
@@ -148,17 +181,19 @@ local getReward = function(addr, timestamp)
   return rewards.stakes[addr].bal
 end
 
+
 Handlers.add(
   "Stake",
   "Credit-Notice",
   function (msg)
+    local qty = m.mul(m.div(msg.Quantity, ten16), ten16)
     if msg.From == aoETH then
       if msg["X-Action"] == "Add-Node" then
 	assert(type(msg["X-URL"]) == 'string', 'X-URL is required!')
-	assert(bint.__le(bint(minETH), bint(msg.Quantity)), 'Deposit not enough!')
+	assert(bint.__le(bint(minETH), bint(qty)), 'Deposit not enough!')
 	count = count + 1
-	nodes[tostring(count)] = { url = msg["X-URL"], admin = msg.Sender, deposit = msg.Quantity, dbs = {} }
-	TotalStake = m.add(TotalStake, msg.Quantity)
+	nodes[tostring(count)] = { url = msg["X-URL"], admin = msg.Sender, deposit = qty, dbs = {} }
+	TotalStake = m.add(TotalStake, qty)
 	msg.reply({ Data = "node added!" })
       else
 	assert(type(msg["X-DB"]) == 'string' and dbs[msg["X-DB"]] ~= nil, 'Valid DB is required!')
@@ -167,16 +202,16 @@ Handlers.add(
 	  local to = msg["X-Delegate-To"]
 	  assert(type(to) == 'string' and db.delegates[to] ~= nil, 'Valid Delegate-To is required!')
 	  db.delegates[to][msg.Sender] = db.delegates[to][msg.Sender] or "0"
-	  db.delegates[to][msg.Sender] = m.add(db.delegates[to][msg.Sender], msg.Quantity)
-	  stake(msg.Sender, msg.Quantity, msg.Timestamp)
+	  db.delegates[to][msg.Sender] = m.add(db.delegates[to][msg.Sender], qty)
+	  stake(msg.Sender, qty, msg.Timestamp)
 	else
 	  db.stakes[msg.Sender] = db.stakes[msg.Sender] or "0"
 	  db.delegates[msg.Sender] = db.delegates[msg.Sender] or {}
-	  db.stakes[msg.Sender] = m.add(db.stakes[msg.Sender], msg.Quantity)
-	  stake(msg.Sender, msg.Quantity, msg.Timestamp)
+	  db.stakes[msg.Sender] = m.add(db.stakes[msg.Sender], qty)
+	  stake(msg.Sender, qty, msg.Timestamp)
 	end
-	db.stake = m.add(db.stake, msg.Quantity)
-	TotalStake = m.add(TotalStake, msg.Quantity)
+	db.stake = m.add(db.stake, qty)
+	TotalStake = m.add(TotalStake, qty)
 	msg.reply({ Data = "staked!" })
       end
     elseif msg.From == dbToken then
@@ -213,28 +248,28 @@ Handlers.add(
   function (msg)
     assert(type(msg["DB"]) == 'string' and dbs[msg["DB"]] ~= nil, 'Valid DB is required!')
     assert(type(msg.Quantity) == 'string', 'Quantity is required!')
+    local qty = m.mul(m.div(msg.Quantity, ten16), ten16)
     local db = dbs[msg["DB"]]
     local staked = "0"
     if type(msg["Delegate-To"]) == "string" then
       assert(isValidAddr(msg["Delegate-To"]), "Invalid Delegate-To address!")
       staked = db.delegates[msg["Delegate-To"]][msg.From] or "0"
-      assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
-      db.delegates[msg["Delegate-To"]][msg.From] = m.sub(staked, msg.Quantity)
+      assert(bint.__le(bint(qty), bint(staked)), "Staked amount is not enough!")
+      db.delegates[msg["Delegate-To"]][msg.From] = m.sub(staked, qty)
     else
       staked = db.stakes[msg.From] or "0"
-      assert(bint.__le(bint(msg.Quantity), bint(staked)), "Staked amount is not enough!")
-      db.stakes[msg.From] = m.sub(staked, msg.Quantity)
+      assert(bint.__le(bint(qty), bint(staked)), "Staked amount is not enough!")
+      db.stakes[msg.From] = m.sub(staked, qty)
     end
-
-    unstake(msg.From, msg.Quantity, msg.Timestamp)
+    unstake(msg.From, qty, msg.Timestamp)
     Send({
 	Target = aoETH,
 	Action = "Transfer",
 	Recipient = msg.From,
-	Quantity = msg.Quantity
+	Quantity = qty
     })
-    TotalStake = m.sub(TotalStake, msg.Quantity)
-    db.stake = m.sub(db.stake, msg.Quantity)
+    TotalStake = m.sub(TotalStake, qty)
+    db.stake = m.sub(db.stake, qty)
     msg.reply({ Data = "withdrew!" })
   end
 )
@@ -243,13 +278,19 @@ Handlers.add(
   "Withdraw-DB",
   "Withdraw-DB",
   function (msg)
-    assert(bint.__lt(0, bint(Balances[msg.From])), "Balance is zero!")
-    local bal = Balances[msg.From]
+    local bal = Balances[msg.From] or "0"
+    RewardWithdraws[msg.From] = RewardWithdraws[msg.From] or "0"
+    RewardWithdraws[msg.From] = m.add(RewardWithdraws[msg.From], bal)
     Balances[msg.From] = "0"
+
     if rewards.stakes[msg.From] ~= nil then
-      bal = m.add(bal, getReward(addr, msg.Timestamp))
+      local r = getReward(msg.From, msg.Timestamp)
+      bal = m.add(bal, r)
+      Withdraws[msg.From] = Withdraws[msg.From] or "0"
+      Withdraws[msg.From] = m.add(Withdraws[msg.From], r)
       rewards.stakes[msg.From].bal = "0"
     end
+    assert(bint.__lt(0, bint(bal)), "Balance is zero!")
     Send({
 	Target = dbToken,
 	Action = "Transfer",
@@ -323,6 +364,7 @@ Handlers.add(
     block.validated_count = block.validated_count + 1
     if block.validated_count == db.validators then
       local price = m.mul(block.txs, db.price)
+      db.txs = db.txs + tonumber(block.txs)
       block.finalized = true
       db.height = db.height + 1
       db.profit = m.add(db.profit, price)
@@ -375,22 +417,31 @@ Handlers.add(
   end
 )
 
+
+function getBalance(addr,ts)
+  local bal = '0'
+  local yield = '0'
+  if (Balances[addr]) then bal = Balances[addr] end
+  if (rewards.stakes[addr]) then yield = getStakes2(addr, ts) end
+  local obj = {
+    Yield = yield,
+    Balance = bal,
+    Total = m.add(bal, yield),
+    Ticker = Ticker,
+    Account = addr,
+    Timestamp = ts
+  }
+  return obj
+end
+
+
 Handlers.add(
   'balance',
   "Balance",
   function(msg)
-    local bal = '0'
-    local yield = '0'
     local addr = msg.Tags.Recipient or msg.Tags.Target or msg.From
-    if (Balances[addr]) then bal = Balances[addr] end
-    if (rewards.stakes[addr]) then yield = getReward(addr, msg.Timestamp) end
-    local obj = {
-      Yield = yield,
-      Balance = bal,
-      Total = m.add(bal, yield),
-      Ticker = Ticker,
-      Account = addr
-    }
+    local timestamp = msg.TS or msg.Timestamp
+    local obj = getBalance(addr, timestamp)
     msg.reply({	Tags = obj, Data = json.encode(obj) })
   end
 )
@@ -400,5 +451,55 @@ Handlers.add(
   "Balances",
   function(msg) 
     msg.reply({ Data = json.encode(Balances) })
+  end
+)
+
+Handlers.add(
+  'Get-Stats',
+  "Get-Stats",
+  function(msg)
+    local addr = msg.Address or msg.From
+    assert(isValidAddr(addr), "Invalid address!")
+    local timestamp = msg.TS or msg.Timestamp
+    local bal = getBalance(addr, timestamp)
+    local stake = 0
+    local delegated = 0
+    local stakes = {}
+    
+    for k, v in pairs(dbs) do
+      for k2, v2 in pairs(v.stakes) do
+	if k2 == addr then
+	  stake = m.add(stake, v2)
+	  stakes[k] = stakes[k] or { stake = "0", delegated = "0" }
+	  stakes[k].stake = m.add(stakes[k].stake, v2)
+	end
+      end
+      for k2, v2 in pairs(v.delegates) do
+	for k3, v3 in pairs(v2) do
+	  if k3 == addr then
+	    stakes[k] = stakes[k] or { stake = "0", delegated = "0" }
+	    stake = m.add(stake, v3)
+	    stakes[k].stake = m.add(stakes[k].stake, v3)
+	  end
+	  if k2 == addr then
+	    stakes[k] = stakes[k] or { stake = "0", delegated = "0" }
+	    delegated = m.add(delegated, v3)
+	    stakes[k].delegated = m.add(stakes[k].delegated, v3)
+	  end
+	end
+      end
+    end
+    
+    local stats = {
+      yield = bal.Yield,
+      withdraw = Withdraws[msg["Address"]] or "0",
+      reward_withdraw = RewardWithdraws[msg["Address"]] or "0",
+      reward = bal.Balance,
+      stake = stake,
+      stakes = stakes,
+      delegated = delegated,
+      timestamp = timestamp
+    }
+    msg.reply({ Data = json.encode(stats) })
   end
 )

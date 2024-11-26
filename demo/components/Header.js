@@ -180,6 +180,7 @@ export default function Header({
               } else {
                 setConnecting(true)
                 try {
+                  let __addr
                   if (typeof arweaveWallet === "undefined") {
                     const arweave = Arweave.init()
                     const createName = "WeaveDB"
@@ -187,6 +188,7 @@ export default function Header({
                     const rpName = "Weave Wallet"
                     const first = new Uint8Array(new Array(32).fill(1)).buffer
                     const user = { id: "weavedb", username: "weave_db" }
+
                     if (wallet) {
                       const dec = new TextDecoder()
                       const opt = await generateAuthenticationOptions({
@@ -216,6 +218,7 @@ export default function Header({
                         setJwk(jwk)
                         setWallet(wallet)
                         setAddr(addr2)
+                        __addr = addr2
                       } else {
                         const jwk = JSON.parse(
                           dec.decode(res.clientExtensionResults.largeBlob.blob),
@@ -224,6 +227,7 @@ export default function Header({
                         setJwk(jwk)
                         setWallet(wallet)
                         setAddr(addr2)
+                        __addr = addr2
                       }
                       toast({
                         title: "Wallet Connected!",
@@ -260,6 +264,7 @@ export default function Header({
                         const rsaEntropy = await deriveEntropyForRSA(key)
                         const jwk = generateDeterministicRSAKey(rsaEntropy)
                         const addr = await arweave.wallets.jwkToAddress(jwk)
+                        __addr = addr
                         const wallet = {
                           addr,
                           id: attResp.id,
@@ -280,6 +285,7 @@ export default function Header({
                       ) {
                         const jwk = await arweave.wallets.generate()
                         const addr = await arweave.wallets.jwkToAddress(jwk)
+                        __addr = addr
                         const wallet = {
                           addr,
                           id: attResp.id,
@@ -341,6 +347,7 @@ export default function Header({
                       "ACCESS_PUBLIC_KEY",
                     ])
                     const addr = await arweaveWallet.getActiveAddress()
+                    __addr = addr
                     setAddr(addr)
                     setConnecting(false)
                     toast({
@@ -350,40 +357,41 @@ export default function Header({
                       isClosable: true,
                     })
                   }
+                  try {
+                    if (__addr) {
+                      const ao = new AO(opt)
+                      const { out } = await ao.dry({
+                        pid: process.env.NEXT_PUBLIC_TDB,
+                        act: "Balance",
+                        tags: { Target: __addr },
+                        get: "Balance",
+                      })
+                      setBalance({ amount: out * 1, addr })
+                      const { out: out2 } = await ao.dry({
+                        pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
+                        act: "Balance",
+                        tags: { Target: __addr },
+                        get: true,
+                      })
+                      setDeposit(out2 * 1)
+                    }
+                  } catch (e) {
+                    console.log(e)
+                  }
                 } catch (e) {
                   err = e.toString()
                 }
-              }
-              setConnecting(false)
-              if (err) {
-                toast({
-                  title: "Something Went Wrong!",
-                  status: "error",
-                  description: err,
-                  duration: 5000,
-                  isClosable: true,
-                })
-              } else {
-                try {
-                  const ao = new AO(opt)
-                  const { out } = await ao.dry({
-                    pid: process.env.NEXT_PUBLIC_TDB,
-                    act: "Balance",
-                    tags: { Target: addr },
-                    get: "Balance",
+                if (err) {
+                  toast({
+                    title: "Something Went Wrong!",
+                    status: "error",
+                    description: err,
+                    duration: 5000,
+                    isClosable: true,
                   })
-                  setBalance({ amount: out * 1, addr })
-                  const { out: out2 } = await ao.dry({
-                    pid: process.env.NEXT_PUBLIC_ADMIN_CONTRACT,
-                    act: "Balance",
-                    tags: { Target: addr },
-                    get: "Balance",
-                  })
-                  setDeposit(out2 * 1)
-                } catch (e) {
-                  console.log(e)
                 }
               }
+              setConnecting(false)
             }
           }}
         >

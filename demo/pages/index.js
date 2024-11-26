@@ -40,11 +40,31 @@ import {
   trim,
   filter,
 } from "ramda"
+const n = (number, deci = 12) =>
+  new Intl.NumberFormat("en-US").format(
+    (Math.floor(number ?? 0) / 10 ** deci).toFixed(0),
+  )
 const wait = ms => new Promise(res => setTimeout(() => res(), ms))
+let gwei = ""
+for (let i = 0; i < 18; i++) gwei += "0"
+const getP = async (pid, jwk) => {
+  let addr
+  if (jwk) {
+    addr = addr
+  } else {
+    await arweaveWallet.connect([
+      "ACCESS_ADDRESS",
+      "SIGN_TRANSACTION",
+      "ACCESS_PUBLIC_KEY",
+    ])
+    addr = await arweaveWallet.getActiveAddress()
+  }
+  const p = (await new AO(opt).init(jwk ?? arweaveWallet)).p(pid)
+  return { addr, p }
+}
 const provider = getDefaultProvider("sepolia", {
   alchemy: process.env.NEXT_PUBLIC_ALCHEMY_KEY,
 })
-const rpc = process.env.NEXT_PUBLIC_RPC
 let html5QrcodeScanner = null
 const validAddress = addr => /^[a-zA-Z0-9_-]{43}$/.test(addr)
 const getQ = ({
@@ -82,7 +102,14 @@ const getQ = ({
     return q
   }
 }
-const commit = async ({ _alert, committing, dbname2, setCommitting, dbs }) => {
+const commit = async ({
+  _alert,
+  committing,
+  dbname2,
+  setCommitting,
+  dbs,
+  rpc,
+}) => {
   let updated = false
   if (!committing[dbname2]) {
     setCommitting(assoc(dbname2, true, committing))
@@ -92,6 +119,7 @@ const commit = async ({ _alert, committing, dbname2, setCommitting, dbs }) => {
       const res = await fetch("/api/commitRoot", {
         method: "POST",
         body: JSON.stringify({
+          rpc,
           contractTxId,
           key: dbname2,
         }),
@@ -188,12 +216,17 @@ const codeDeploy6 = ({ txid, path, zkp, fn }) => {
 }
 
 export default function Home({ _date = null }) {
+  const [as, setAS] = useState("Validator")
+  const [delegatee, setDelegatee] = useState(null)
   const [to, setTo] = useState("")
   const [sendAmount, setSendAmount] = useState("0")
   const [token, setToken] = useState(process.env.NEXT_PUBLIC_TDB)
   const [walletTab, setWalletTab] = useState("Tokens")
   const [jwk, setJwk] = useState(null)
   const [depositing, setDepositing] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [staking, setStaking] = useState(false)
   const [sending, setSending] = useState(false)
   const toast = useToast()
   const [isDashboard, setIsDashboard] = useState(false)
@@ -203,6 +236,7 @@ export default function Home({ _date = null }) {
   const [isReceive, setIsReceive] = useState(false)
   const [op, setOp] = useState("Deposit")
   const [amount, setAmount] = useState("100")
+  const [grpc, setGRPC] = useState("https://")
   const [where, setWhere] = useState("")
   const [qtype, setQType] = useState("disclosure")
   const [operator, setOperator] = useState("")
@@ -252,9 +286,17 @@ export default function Home({ _date = null }) {
   const [addr, setAddr] = useState(null)
   const [balance, setBalance] = useState(null)
   const [balanceETH, setBalanceETH] = useState(null)
+  const [isStake, setIsStake] = useState(null)
   const [deposit, setDeposit] = useState(0)
+  const [nodeDeposit, setNodeDeposit] = useState("1")
   const [stats, setStats] = useState(null)
+  const [myStats, setMyStats] = useState(null)
   const [count, setCount] = useState(0)
+  const [nodes, setNodes] = useState([])
+  const [node, setNode] = useState(null)
+  const [stakeStats, setStakeStats] = useState(null)
+  const [allDBs, setAllDBs] = useState({})
+  const [stakeAmount, setStakeAmount] = useState(1)
   const _path = isNil(zkp)
     ? null
     : [Number(zkp.col_id).toString(), toIndex(zkp.data.name), ...path(zkp.tar)]
@@ -266,34 +308,58 @@ export default function Home({ _date = null }) {
     { key: "zkjson", name: "zkJSON" },
     { key: "usecases", name: "Use Cases" },
   ]
-
   useEffect(() => {
     ;(async () => {
-      try {
-        const db = new DB({ rpc, contractTxId: dbname, arweave: network })
-        const stats = await db.node({ op: "stats" })
-        setStats(stats)
-        const _dbs = filter(
-          v => !isNil(v.data.admin) && !isNil(v.data.contractTxId),
-        )(stats.dbs)
-        setDBs(_dbs)
-        if (_dbs[0]) {
-          setDBName2(_dbs[0].id ?? null)
-          const db2 = new DB({
-            rpc,
-            contractTxId: _dbs[0].id,
-            arweave: network,
-          })
-          const _cols = await db2.listCollections()
-          setSelectedCol(_cols[0] ?? null)
-          setCols(_cols)
-          if (!isNil(_cols[0])) setProfiles(await db2.get(_cols[0]))
-        }
-      } catch (e) {
-        console.log(e)
+      const ao = new AO()
+      const p = new AO(opt).p(process.env.NEXT_PUBLIC_STAKING)
+      setStakeStats(await p.d("Info"))
+      setAllDBs(await p.d("Get-DBs"))
+      const _nodes = await p.d("Get-Nodes")
+      let __nodes = []
+      let n = null
+      for (const k in _nodes) {
+        const _n = { id: k, info: _nodes[k] }
+        if (!n) n = _n
+        __nodes.push(_n)
       }
+      setNode(n)
+      setNodes(__nodes)
     })()
   }, [])
+  useEffect(() => {
+    ;(async () => {
+      if (node) {
+        try {
+          const db = new DB({
+            rpc: node.info.url,
+            contractTxId: dbname,
+            arweave: network,
+          })
+          const stats = await db.node({ op: "stats" })
+          setStats(stats)
+          const _dbs = filter(
+            v => !isNil(v.data.admin) && !isNil(v.data.contractTxId),
+          )(stats.dbs)
+          setDBs(_dbs)
+          if (_dbs[0]) {
+            setDBName2(_dbs[0].id ?? null)
+            const db2 = new DB({
+              rpc: node.info.url,
+              contractTxId: _dbs[0].id,
+              arweave: network,
+            })
+            const _cols = await db2.listCollections()
+            setSelectedCol(_cols[0] ?? null)
+            setCols(_cols)
+            if (!isNil(_cols[0])) setProfiles(await db2.get(_cols[0]))
+          }
+        } catch (e) {
+          console.log(e)
+        }
+      }
+    })()
+  }, [node])
+
   useInterval(async () => {
     if (addr) {
       const ao = new AO(opt)
@@ -333,6 +399,19 @@ export default function Home({ _date = null }) {
       if (out2) setBalanceETH({ addr, amount: out2 * 1 })
     }
   }, 5000)
+  useInterval(async () => {
+    if (addr) {
+      const ao = new AO(opt)
+      const { out: out3 } = await ao.dry({
+        pid: process.env.NEXT_PUBLIC_STAKING,
+        act: "Get-Stats",
+        tags: { Address: addr, TS: Date.now() },
+        get: true,
+      })
+      if (out3) setMyStats(out3)
+    }
+  }, 10000)
+
   const _token =
     token === process.env.NEXT_PUBLIC_TDB
       ? { tick: "tDB", balance, decimal: 12 }
@@ -342,6 +421,16 @@ export default function Home({ _date = null }) {
     ? ""
     : (indexBy(prop("id"), dbs)[zkp.db]?.data?.contractTxId ?? "")
   const deploy_ok = !/^\s*$/.test(dbname) && deposit * 1 >= 100 * 10 ** 12
+  let add_node_ok =
+    nodeDeposit * 1 >= 1 &&
+    balanceETH &&
+    balanceETH.amount * 1 >= nodeDeposit * 10 ** 18 &&
+    /^http(s){0,1}:\/\/.+$/.test(grpc)
+  let staking_ok =
+    stakeAmount * 1 >= 1 &&
+    balanceETH &&
+    balanceETH.amount * 1 >= stakeAmount * 10 ** 18 &&
+    (as !== "Delegator" || delegatee)
   let deposit_ok =
     amount * 1 > 0 && balance && balance.amount * 1 >= amount * 10 ** 12
   if (op === "Withdraw") {
@@ -389,6 +478,40 @@ export default function Home({ _date = null }) {
         },
       ]
   const dbmap = indexBy(prop("id"))(dbs ?? [])
+  const pool = (stakeStats?.Rewards.pool ?? 0) * 1
+  const day = pool / 10 ** 12 / 365
+  const mystake = (myStats?.stake ?? 0) * 1
+  const allstake = (stakeStats?.TotalStake ?? 0) * 1
+  const dayYield = Math.floor((day * mystake) / allstake)
+  const withdrawable =
+    (myStats?.["yield"] ?? 0) * 1 + (myStats?.["reward"] ?? 0) * 1
+  const alltime_yield =
+    (myStats?.["yield"] ?? 0) * 1 + (myStats?.["withdraw"] ?? 0) * 1
+  const alltime_reward =
+    (myStats?.["reward"] ?? 0) * 1 + (myStats?.["reward_withdraw"] ?? 0) * 1
+  const adbs = []
+  for (let k in allDBs) {
+    adbs.push({ id: k, info: allDBs[k] })
+  }
+  const _validators = allDBs?.[isStake]?.stakes
+
+  let validators = []
+  if (_validators) {
+    for (let k in _validators ?? {}) {
+      const _delegators = allDBs?.[isStake]?.delegates?.[k]
+      let obj = {
+        addr: k,
+        amount: _validators[k] * 1,
+        delegated: 0,
+        delegates: [],
+      }
+      for (let k2 in _delegators ?? {}) {
+        obj.delegated += _delegators[k2]
+        obj.delegates.push(k2)
+      }
+      validators.push(obj)
+    }
+  }
   return (
     <>
       <Header
@@ -409,18 +532,30 @@ export default function Home({ _date = null }) {
       {isDashboard ? (
         <Box mt="60px">
           <Flex justify="center">
-            <Box w="100%" maxW="1150px" py={[6, 8, 10]} px={[4, 6, 10]}>
+            <Box w="100%" maxW="1150px" py={[4]} px={[4, 6, 10]}>
               <Flex>
                 <Flex direction="column" justify="center" flex={1}>
-                  <Box fontSize="16px" color="#999" align="center">
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mb={2}
+                    py={1}
+                  >
                     Your tDB
                   </Box>
                   <Flex align="center" fontSize="35px" justify="center">
                     <Image src="/logo.svg" mr={4} boxSize="35px" />
-                    {((balance?.amount ?? 0) / 10 ** 12).toFixed(12)}
+                    {n(balance?.amount)}
                   </Flex>
-                  <Box fontSize="16px" color="#999" align="center">
-                    / 10,000,000,000
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mt={2}
+                    py={1}
+                  >
+                    = {((balance?.amount ?? 0) / 10 ** 13).toFixed(0)} USD
                   </Box>
                 </Flex>
                 <Box flex={1}>
@@ -457,13 +592,197 @@ export default function Home({ _date = null }) {
                       Total Supply : 10,000,000,000
                     </Flex>
                     <Flex align="center" fontSize="12px" color="#666" my={2}>
-                      Annual Inflation : 10 %
+                      Reward Pool : {n(stakeStats?.Rewards?.pool)} tDB / year
+                    </Flex>
+                    <Flex align="center" fontSize="12px" color="#666" my={2}>
+                      Total Deposit : {n(stakeStats?.TotalDeposit, 18)} tDB
+                    </Flex>
+                    <Flex align="center" fontSize="12px" color="#666" my={2}>
+                      Total Stakes : {n(stakeStats?.TotalStake, 18)} taoETH
                     </Flex>
                   </Box>
                 </Box>
               </Flex>
+
+              <Flex>
+                <Flex
+                  direction="column"
+                  justify="center"
+                  flex={1}
+                  sx={{ border: "1px solid #9C89F6", borderRadius: "5px" }}
+                  m={4}
+                  p={6}
+                >
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mb={2}
+                    py={1}
+                  >
+                    Staking Amount
+                  </Box>
+                  <Flex align="center" fontSize="35px" justify="center">
+                    <Image src="/eth.png" mr={4} boxSize="35px" />
+                    {n(myStats?.stake, 18)}
+                  </Flex>
+                  <Flex
+                    mt={2}
+                    fontSize="16px"
+                    color="#999"
+                    justify="center"
+                    py={1}
+                  >
+                    Yield : {n(dayYield, 0)} tDB / day
+                  </Flex>
+                </Flex>
+                <Flex
+                  direction="column"
+                  justify="center"
+                  flex={1}
+                  sx={{ border: "1px solid #9C89F6", borderRadius: "5px" }}
+                  m={4}
+                  p={6}
+                >
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mb={2}
+                    py={1}
+                  >
+                    Staking Yields
+                  </Box>
+                  <Flex align="center" fontSize="35px" justify="center">
+                    <Image src="/logo.svg" mr={4} boxSize="35px" />
+                    {n(myStats?.["yield"])}
+                  </Flex>
+                  <Flex
+                    mt={2}
+                    fontSize="16px"
+                    color="#999"
+                    justify="center"
+                    py={1}
+                  >
+                    All Time : {n(alltime_yield)}
+                  </Flex>
+                </Flex>
+                <Flex
+                  direction="column"
+                  justify="center"
+                  flex={1}
+                  sx={{ border: "1px solid #9C89F6", borderRadius: "5px" }}
+                  m={4}
+                  p={6}
+                >
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mb={2}
+                    py={1}
+                  >
+                    Validator Rewards
+                  </Box>
+                  <Flex align="center" fontSize="35px" justify="center">
+                    <Image src="/logo.svg" mr={4} boxSize="35px" />
+                    {n(myStats?.reward)}
+                  </Flex>
+                  <Flex
+                    mt={2}
+                    fontSize="16px"
+                    color="#999"
+                    justify="center"
+                    py={1}
+                  >
+                    All Time : {n(alltime_reward)}
+                  </Flex>
+                </Flex>
+                <Flex
+                  direction="column"
+                  justify="center"
+                  flex={1}
+                  sx={{ border: "1px solid #9C89F6", borderRadius: "5px" }}
+                  m={4}
+                  p={6}
+                >
+                  <Box
+                    fontSize="16px"
+                    color="#999"
+                    align="center"
+                    mb={2}
+                    py={1}
+                  >
+                    Total Earnings
+                  </Box>
+                  <Flex align="center" fontSize="35px" justify="center">
+                    <Image src="/logo.svg" mr={4} boxSize="35px" />
+                    {n(withdrawable)}
+                  </Flex>
+                  <Flex
+                    mt={2}
+                    h="32px"
+                    align="center"
+                    fontSize={["12px", "14px"]}
+                    color="#999"
+                    justify="center"
+                    bg={withdrawable > 0 ? "#5137C5" : "#999"}
+                    color="white"
+                    py={1}
+                    sx={{
+                      borderRadius: "3px",
+                      cursor: withdrawable > 0 ? "pointer" : "default",
+                      ":hover": { opacity: 0.75 },
+                    }}
+                    onClick={async () => {
+                      if (!withdrawing && withdrawable > 0) {
+                        setWithdrawing(true)
+                        const { addr, p } = await getP(
+                          process.env.NEXT_PUBLIC_STAKING,
+                          jwk,
+                        )
+                        try {
+                          await p.m("Withdraw-DB", null, {
+                            check: /withdrew/,
+                            jwk,
+                          })
+                          toast({
+                            title: `Reward withdrawn!`,
+                            status: "success",
+                            duration: 3000,
+                            isClosable: true,
+                          })
+                        } catch (e) {}
+                        setWithdrawing(false)
+                      }
+                    }}
+                  >
+                    {withdrawing ? (
+                      <Box as="i" className="fas fa-spin fa-circle-notch" />
+                    ) : (
+                      <Box>Withdraw</Box>
+                    )}
+                  </Flex>
+                </Flex>
+              </Flex>
               <Box>
-                {map(v => {
+                {map(_v => {
+                  const v = _v.info
+                  const node = nodes[v.node]
+                  let mystake = 0
+                  console.log(_v)
+                  if (!is(Array, v.stakes)) {
+                    for (let k in v.stakes) {
+                      if (k === addr) mystake += v.stakes[k] * 1
+                    }
+                  }
+                  if (!is(Array, v.delegates)) {
+                    for (let k in v.delegates) {
+                      for (let k2 in v.delegates[k]) {
+                        if (k === addr) mystake += v.delegates[k][k2] * 1
+                      }
+                    }
+                  }
                   console.log(v)
                   return (
                     <Flex
@@ -473,13 +792,17 @@ export default function Home({ _date = null }) {
                       }}
                       m={4}
                       align="center"
+                      px={4}
                     >
                       <Box p={4} w="150px">
                         <Box fontWeight="bold" fontSize="18px" color="#5137C5">
-                          {v.id}
+                          {_v.id.slice(0, 7)}
                         </Box>
                         <Box fontSize="12px" color="#666">
-                          wdb.ae
+                          {(node?.info.url ?? "").replace(
+                            /^http(s){0,1}:\/\//,
+                            "",
+                          )}
                         </Box>
                       </Box>
                       <Box p={4} w="120px">
@@ -489,7 +812,7 @@ export default function Home({ _date = null }) {
                           fontSize="18px"
                           color="#5137C5"
                         >
-                          1
+                          {n(v.price)}
                           <Box ml={2} fontSize="12px" mb={1}>
                             tDB
                           </Box>
@@ -505,7 +828,7 @@ export default function Home({ _date = null }) {
                           fontSize="18px"
                           color="#5137C5"
                         >
-                          1000
+                          {v.txs}
                           <Box ml={2} fontSize="12px" mb={1}>
                             txs
                           </Box>
@@ -521,13 +844,13 @@ export default function Home({ _date = null }) {
                           fontSize="18px"
                           color="#5137C5"
                         >
-                          1000
+                          {n(v.deposit)}
                           <Box ml={2} fontSize="12px" mb={1}>
                             tDB
                           </Box>
                         </Flex>
                         <Box fontSize="12px" color="#666">
-                          Base Profit
+                          Deposit
                         </Box>
                       </Box>
                       <Box p={4} w="120px">
@@ -537,7 +860,23 @@ export default function Home({ _date = null }) {
                           fontSize="18px"
                           color="#5137C5"
                         >
-                          1000
+                          {n(v.profit)}
+                          <Box ml={2} fontSize="12px" mb={1}>
+                            tDB
+                          </Box>
+                        </Flex>
+                        <Box fontSize="12px" color="#666">
+                          Total Profit
+                        </Box>
+                      </Box>
+                      <Box p={4} w="120px">
+                        <Flex
+                          align="flex-end"
+                          fontWeight="bold"
+                          fontSize="18px"
+                          color="#5137C5"
+                        >
+                          {n(v.stake, 18)}
                           <Box ml={2} fontSize="12px" mb={1}>
                             taoETH
                           </Box>
@@ -553,7 +892,7 @@ export default function Home({ _date = null }) {
                           fontSize="18px"
                           color="#5137C5"
                         >
-                          100
+                          {n(mystake, 18)}
                           <Box ml={2} fontSize="12px" mb={1}>
                             taoETH
                           </Box>
@@ -562,33 +901,27 @@ export default function Home({ _date = null }) {
                           Your Stake
                         </Box>
                       </Box>
-                      <Box p={4} w="120px">
-                        <Flex
-                          align="flex-end"
-                          fontWeight="bold"
-                          fontSize="18px"
-                          color="#5137C5"
-                        >
-                          10
-                          <Box ml={2} fontSize="12px" mb={1}>
-                            tDB
-                          </Box>
-                        </Flex>
-                        <Box fontSize="12px" color="#666">
-                          Your Profit
-                        </Box>
-                      </Box>
                       <Box p={4} flex={1} fontSize="12px">
-                        <Flex my={1} color="#5137C5">
-                          Stake taoETH
-                        </Flex>
-                        <Flex my={1} color="#5137C5">
-                          Withdraw
+                        <Flex
+                          my={1}
+                          bg="#5137C5"
+                          justify="center"
+                          p={2}
+                          color="white"
+                          sx={{
+                            borderRadius: "3px",
+                            cursor: "pointer",
+                            ":hover": { opacity: 0.75 },
+                          }}
+                          fontSize={["12px", "14px"]}
+                          onClick={() => setIsStake(_v.id)}
+                        >
+                          Stake
                         </Flex>
                       </Box>
                     </Flex>
                   )
-                })(dbs)}
+                })(adbs)}
               </Box>
             </Box>
           </Flex>
@@ -1202,6 +1535,29 @@ export default function Home({ _date = null }) {
                       <Box flex={1} />
                     </Box>
                     <Box
+                      my={4}
+                      sx={{
+                        borderRadius: "5px",
+                        border: "1px solid #9C89F6",
+                      }}
+                      p={4}
+                      bg="white"
+                    >
+                      <Box display={["block", "flex"]}>
+                        <Box mr={4} flex={1}>
+                          <Box mb={1}>Select Node</Box>
+                          <Select
+                            value={node?.id}
+                            onChange={e => setNode(nodes[e.target.value])}
+                          >
+                            {map(v => (
+                              <option value={v.id}>{v.info.url}</option>
+                            ))(nodes)}
+                          </Select>
+                        </Box>
+                      </Box>
+                    </Box>
+                    <Box
                       mb={6}
                       w="100%"
                       sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
@@ -1225,7 +1581,7 @@ export default function Home({ _date = null }) {
                           }}
                           px={4}
                         >
-                          https://test.wdb.ae
+                          {node?.info.url}
                         </Box>
                       </Flex>
                       <Flex align="center" mt={2}>
@@ -1239,6 +1595,7 @@ export default function Home({ _date = null }) {
                         </Flex>
                         <Box
                           flex={1}
+                          fontSize="12px"
                           sx={{
                             ":hover": { opacity: 0.75 },
                             wordBreak: "break-all",
@@ -1247,9 +1604,9 @@ export default function Home({ _date = null }) {
                         >
                           <Link
                             target="_blank"
-                            href={`https://ao.link/#/entity/${stats?.bundler}`}
+                            href={`https://ao.link/#/entity/${node?.info.admin}`}
                           >
-                            {stats?.bundler}
+                            {node?.info.admin}
                           </Link>
                         </Box>
                       </Flex>
@@ -1263,6 +1620,7 @@ export default function Home({ _date = null }) {
                           Subledger
                         </Flex>
                         <Box
+                          fontSize="12px"
                           flex={1}
                           sx={{
                             ":hover": { opacity: 0.75 },
@@ -1276,6 +1634,30 @@ export default function Home({ _date = null }) {
                           >
                             {process.env.NEXT_PUBLIC_ADMIN_CONTRACT}
                           </Link>
+                        </Box>
+                      </Flex>
+                      <Flex align="center" mt={2}>
+                        <Flex
+                          justify="center"
+                          bg="white"
+                          w={["80px", "100px"]}
+                          sx={{ borderRadius: "5px" }}
+                        >
+                          Security
+                        </Flex>
+                        <Box
+                          fontSize="12px"
+                          flex={1}
+                          sx={{
+                            ":hover": { opacity: 0.75 },
+                            wordBreak: "break-all",
+                          }}
+                          px={4}
+                        >
+                          {Math.floor(
+                            (node?.info.deposit ?? 0) / 1000000000000000000,
+                          )}{" "}
+                          taoETH
                         </Box>
                       </Flex>
                     </Box>
@@ -1513,7 +1895,7 @@ export default function Home({ _date = null }) {
                                         .NEXT_PUBLIC_ADMIN_CONTRACT,
                                       act: "Balance",
                                       tags: { Target: _addr },
-                                      get: "Balance",
+                                      get: true,
                                     })
                                     setDeposit(out2 * 1)
                                     setAddr(_addr)
@@ -1578,20 +1960,13 @@ export default function Home({ _date = null }) {
                         bg="white"
                       >
                         <Box display={["block", "flex"]}>
-                          <Box mr={4}>
-                            <Box mb={1}>Select Node</Box>
-                            <Select w="150px">
-                              <option>test.wdb.ae</option>
-                            </Select>
-                          </Box>
-                          <Box mr={4} mt={[4, 0]}>
+                          <Box mr={4} mt={[4, 0]} flex={1}>
                             <Box mb={1}>New DB Name</Box>
                             <Input
                               value={dbname}
                               onChange={e => setDBName(e.target.value)}
                             />
                           </Box>
-                          <Box flex={1} />
                           <Box
                             alignItems="flex-end"
                             mt={[4, 0]}
@@ -1645,7 +2020,7 @@ export default function Home({ _date = null }) {
                                   }
                                   setDeploying(true)
                                   const db = new DB({
-                                    rpc,
+                                    rpc: node.info.url,
                                     contractTxId: dbname,
                                     arweave: network,
                                   })
@@ -1668,10 +2043,6 @@ export default function Home({ _date = null }) {
                                           op: "deploy_contract",
                                           key: dbname,
                                           type: "ao",
-                                          module:
-                                            "YTNXvQu2x21DD6Pm8zicVBghB-BlnM5VRrVRyfhBPP8",
-                                          scheduler:
-                                            "-_vZZQMEnvJmiIIfHfp_KuuV6ud2b9VSThfTmYytYQ8",
                                         },
                                         { ar2: jwk ?? arweaveWallet },
                                       )
@@ -1697,6 +2068,11 @@ export default function Home({ _date = null }) {
                                       duration: 5000,
                                       isClosable: true,
                                     })
+                                    const p = new AO(opt).p(
+                                      process.env.NEXT_PUBLIC_STAKING,
+                                    )
+                                    setStakeStats(await p.d("Info"))
+                                    setAllDBs(await p.d("Get-DBs"))
                                   } catch (e) {
                                     toast({
                                       title: "Something Went Wrong!",
@@ -1808,6 +2184,174 @@ export default function Home({ _date = null }) {
                         </Flex>
                       </>
                     ) : null}
+                    <Box
+                      display={["block", null, "flex"]}
+                      mt={6}
+                      mb={4}
+                      alignItems="center"
+                      color="#9C89F6"
+                    >
+                      <Flex
+                        px={4}
+                        py={1}
+                        bg="#9C89F6"
+                        color="white"
+                        sx={{ borderRadius: "50px" }}
+                        mb={[4, null, 0]}
+                      >
+                        Add Node
+                      </Flex>
+                      <Box flex={1} />
+                      <Flex px={[4, null, 0]}>
+                        Balance:
+                        <Box mx={2}>
+                          {(balanceETH ? balanceETH.amount : 0) /
+                            1000000000000000000}{" "}
+                          taoETH
+                        </Box>
+                      </Flex>
+                      <Flex ml={[0, null, 4]} px={[4, null, 0]}>
+                        Min Stake:
+                        <Box mx={2}>1 taoETH</Box>
+                      </Flex>
+                    </Box>
+                    <Box
+                      color="#9C89F6"
+                      mb={6}
+                      w="100%"
+                      sx={{ borderRadius: "5px", border: "1px solid #9C89F6" }}
+                      p={4}
+                      fontSize={["12px", "14px"]}
+                      bg="white"
+                    >
+                      <Box display={["block", "flex"]}>
+                        <Box mr={4} mt={[4, 0]} flex={1}>
+                          <Box mb={1}>Node gRPC URL</Box>
+                          <Input
+                            placeholder="https://"
+                            value={grpc}
+                            onChange={e => setGRPC(e.target.value)}
+                          />
+                        </Box>
+                        <Box mr={4} mt={[4, 0]} maxW="100px">
+                          <Box mb={1}>Stake (taoETH)</Box>
+                          <Input
+                            value={nodeDeposit}
+                            onChange={e => {
+                              if (
+                                !Number.isNaN(+e.target.value) &&
+                                Math.round(e.target.value * 1) ===
+                                  +e.target.value
+                              ) {
+                                setNodeDeposit(e.target.value)
+                              }
+                            }}
+                          />
+                        </Box>
+                        <Box
+                          alignItems="flex-end"
+                          mt={[4, 0]}
+                          display={["block", "flex"]}
+                        >
+                          <Flex
+                            h="40px"
+                            justify="center"
+                            w="100px"
+                            align="center"
+                            bg={add_node_ok ? "#5137C5" : "#999"}
+                            color="white"
+                            py={1}
+                            px={3}
+                            sx={{
+                              borderRadius: "5px",
+                              ":hover": { opacity: 0.75 },
+                              cursor: add_node_ok ? "pointer" : "default",
+                            }}
+                            onClick={async pid => {
+                              if (!adding && add_node_ok) {
+                                let err
+                                try {
+                                  setAdding(true)
+                                  const { addr, p } = await getP(
+                                    process.env.NEXT_PUBLIC_ETH,
+                                    jwk,
+                                  )
+                                  const { err: _err, res } = await p.msg(
+                                    "Transfer",
+                                    {
+                                      Recipient:
+                                        process.env.NEXT_PUBLIC_STAKING,
+                                      Quantity: `${nodeDeposit}${gwei}`,
+                                      "X-Action": "Add-Node",
+                                      "X-URL": grpc,
+                                    },
+                                    { check: /transferred/ },
+                                  )
+                                  if (_err) {
+                                    err = _err.toString()
+                                  } else {
+                                    toast({
+                                      title: `Node Added!`,
+                                      status: "success",
+                                      description: grpc,
+                                      duration: 5000,
+                                      isClosable: true,
+                                    })
+                                    setGRPC("https://")
+                                    try {
+                                      const out = await p.d(
+                                        "Balance",
+                                        { Target: addr },
+                                        { get: "Balance" },
+                                      )
+                                      setBalanceETH({ amount: out * 1, addr })
+                                      const p2 = getP(
+                                        process.env.NEXT_PUBLIC_STAKING,
+                                        jwk,
+                                      )
+                                      await wait(3000)
+                                      const _nodes = await p2.d("Get-Nodes")
+                                      let __nodes = []
+                                      let n = null
+                                      for (const k in _nodes) {
+                                        const _n = { id: k, info: _nodes[k] }
+                                        if (!n) n = _n
+                                        __nodes.push(_n)
+                                      }
+                                      if (!node) setNode(n)
+                                      setNodes(__nodes)
+                                    } catch (e) {
+                                      console.log(e)
+                                    }
+                                  }
+                                } catch (e) {
+                                  err = e.toString()
+                                }
+                                setAdding(false)
+                                if (err) {
+                                  toast({
+                                    title: `Something Went Wrong!`,
+                                    status: "error",
+                                    description: err,
+                                    duration: 5000,
+                                    isClosable: true,
+                                  })
+                                }
+                              }
+                            }}
+                          >
+                            {adding ? (
+                              <Box
+                                as="i"
+                                className="fas fa-spin fa-circle-notch"
+                              />
+                            ) : (
+                              <Box>Add</Box>
+                            )}
+                          </Flex>
+                        </Box>
+                      </Box>
+                    </Box>
                   </Box>
                 </Flex>
               </Box>
@@ -1846,7 +2390,7 @@ export default function Home({ _date = null }) {
                               const dbname = e.target.value
                               setDBName2(dbname)
                               const db = new DB({
-                                rpc,
+                                rpc: node.info.url,
                                 contractTxId: dbname,
                                 arweave: network,
                               })
@@ -1881,7 +2425,7 @@ export default function Home({ _date = null }) {
                                 dbname2
                               ].data.contractTxId
                               const db = new DB({
-                                rpc,
+                                rpc: node.info.url,
                                 contractTxId,
                                 arweave: network,
                               })
@@ -1938,6 +2482,7 @@ export default function Home({ _date = null }) {
                           AO Process
                         </Flex>
                         <Box
+                          fontSize="12px"
                           flex={1}
                           sx={{
                             ":hover": { opacity: 0.75 },
@@ -1963,6 +2508,7 @@ export default function Home({ _date = null }) {
                           Owner
                         </Flex>
                         <Box
+                          fontSize="12px"
                           flex={1}
                           sx={{
                             ":hover": { opacity: 0.75 },
@@ -2136,7 +2682,7 @@ export default function Home({ _date = null }) {
                                           dbs,
                                         )[dbname2].data.contractTxId
                                         const db = new DB({
-                                          rpc,
+                                          rpc: node.info.url,
                                           contractTxId,
                                           arweave: network,
                                         })
@@ -2454,7 +3000,7 @@ export default function Home({ _date = null }) {
                                       dbs,
                                     )[dbname2].data.contractTxId
                                     const db = new DB({
-                                      rpc,
+                                      rpc: node.info.url,
                                       contractTxId,
                                     })
                                     const ppl = {
@@ -2484,6 +3030,7 @@ export default function Home({ _date = null }) {
                                       setTimeout(async () => {
                                         do {
                                           updated = await commit({
+                                            rpc: node.info.url,
                                             committing,
                                             dbname2,
                                             dbs,
@@ -2771,7 +3318,7 @@ export default function Home({ _date = null }) {
                                     dbname2
                                   ].data.contractTxId
                                   const db = new DB({
-                                    rpc,
+                                    rpc: node.info.url,
                                     contractTxId,
                                   })
                                   const start = Date.now()
@@ -3075,7 +3622,10 @@ export default function Home({ _date = null }) {
                                       prop("id"),
                                       dbs,
                                     )[dbname2].data.contractTxId
-                                    const db = new DB({ rpc, contractTxId })
+                                    const db = new DB({
+                                      rpc: node.info.url,
+                                      contractTxId,
+                                    })
                                     const start = Date.now()
                                     try {
                                       let _zkp = {
@@ -3509,7 +4059,7 @@ export default function Home({ _date = null }) {
                                             dbs,
                                           )[zkp.db].data.contractTxId
                                           const db = new DB({
-                                            rpc,
+                                            rpc: node.info.url,
                                             contractTxId,
                                           })
                                           const hash = (
@@ -3662,6 +4212,7 @@ export default function Home({ _date = null }) {
                                       let updated = true
                                       do {
                                         updated = await commit({
+                                          rpc: node.info.url,
                                           committing,
                                           dbname2: zkp.db,
                                           dbs,
@@ -3907,6 +4458,261 @@ export default function Home({ _date = null }) {
         </>
       )}
       {isWallet ? null : <Footer />}
+      {!isStake ? null : (
+        <Flex
+          w="100%"
+          h="100%"
+          sx={{ top: 0, left: 0, position: "fixed", zIndex: 100 }}
+          bg="rgba(0,0,0,.5)"
+          justify="center"
+          align="center"
+        >
+          <Box
+            bg="white"
+            maxW="600px"
+            w="100%"
+            sx={{ borderRadius: "10px" }}
+            p={6}
+          >
+            <Box
+              display={["block", null, "flex"]}
+              alignItems="center"
+              color="#9C89F6"
+            >
+              <Flex
+                px={4}
+                py={1}
+                bg="#9C89F6"
+                color="white"
+                sx={{ borderRadius: "50px" }}
+                mb={[4, null, 0]}
+              >
+                Stake on {isStake.slice(0, 7)}
+              </Flex>
+              <Box flex={1} />
+              <Flex px={[4, null, 0]}>
+                Balance:
+                <Box mx={2}>
+                  {(balanceETH ? balanceETH.amount : 0) / 1000000000000000000}{" "}
+                  taoETH
+                </Box>
+              </Flex>
+              <Box
+                ml={6}
+                mt="-30px"
+                mr="-5px"
+                color="#9C89F6"
+                as="i"
+                className="fas fa-times"
+                sx={{
+                  cursor: "pointer",
+                  ":hover": { opacity: 0.75 },
+                }}
+                onClick={() => setIsStake(null)}
+              />
+            </Box>
+            <Box
+              color="#9C89F6"
+              w="100%"
+              p={4}
+              fontSize={["12px", "14px"]}
+              bg="white"
+            >
+              <Box display={["block", "flex"]}>
+                <Box mr={4} mt={[4, 0]} flex={1}>
+                  <Box mb={1}>As</Box>
+                  <Select value={as} onChange={e => setAS(e.target.value)}>
+                    <option value="Validator">Validator</option>
+                    <option value="Delegator">Delegator</option>
+                  </Select>
+                </Box>
+                <Box mr={4} mt={[4, 0]} flex={1}>
+                  <Box mb={1}>Min: 1 taoETH</Box>
+                  <Input
+                    placeholder="taoETH"
+                    value={stakeAmount}
+                    onChange={e => {
+                      if (
+                        !Number.isNaN(+e.target.value) &&
+                        Math.round(e.target.value * 1) === +e.target.value
+                      ) {
+                        setStakeAmount(e.target.value)
+                      }
+                    }}
+                  />
+                </Box>
+                <Box
+                  alignItems="flex-end"
+                  mt={[4, 0]}
+                  display={["block", "flex"]}
+                >
+                  <Flex
+                    h="40px"
+                    justify="center"
+                    w="100px"
+                    align="center"
+                    bg={staking_ok ? "#5137C5" : "#999"}
+                    color="white"
+                    py={1}
+                    px={3}
+                    sx={{
+                      borderRadius: "5px",
+                      ":hover": { opacity: 0.75 },
+                      cursor: staking_ok ? "pointer" : "default",
+                    }}
+                    onClick={async pid => {
+                      if (!staking && staking_ok) {
+                        let err
+                        try {
+                          setStaking(true)
+                          const { addr, p } = await getP(
+                            process.env.NEXT_PUBLIC_ETH,
+                            jwk,
+                          )
+                          let tags = {
+                            Recipient: process.env.NEXT_PUBLIC_STAKING,
+                            Quantity: `${stakeAmount}${gwei}`,
+                            "X-DB": isStake,
+                          }
+                          if (as === "Delegator") {
+                            ;(tags["X-Action"] = "Delegate"),
+                              (tags["X-Delegate-To"] = delegatee)
+                          }
+                          const { err: _err, res } = await p.msg(
+                            "Transfer",
+                            tags,
+                            { check: /transferred/ },
+                          )
+                          if (_err) {
+                            err = _err.toString()
+                          } else {
+                            toast({
+                              title: `Staked!`,
+                              status: "success",
+                              duration: 5000,
+                              isClosable: true,
+                            })
+                            setGRPC("https://")
+                            setIsStake(null)
+                            try {
+                              const out = await p.d(
+                                "Balance",
+                                { Target: addr },
+                                { get: "Balance" },
+                              )
+                              setBalanceETH({ amount: out * 1, addr })
+                              const p2 = new AO(opt).p(
+                                process.env.NEXT_PUBLIC_STAKING,
+                              )
+                              setStakeStats(await p2.d("Info"))
+                              setAllDBs(await p2.d("Get-DBs"))
+                            } catch (e) {
+                              console.log(e)
+                            }
+                          }
+                        } catch (e) {
+                          err = e.toString()
+                        }
+                        setStaking(false)
+                        if (err) {
+                          toast({
+                            title: `Something Went Wrong!`,
+                            status: "error",
+                            description: err,
+                            duration: 5000,
+                            isClosable: true,
+                          })
+                        }
+                      }
+                    }}
+                  >
+                    {staking ? (
+                      <Box as="i" className="fas fa-spin fa-circle-notch" />
+                    ) : (
+                      <Box>Stake</Box>
+                    )}
+                  </Flex>
+                </Box>
+              </Box>
+            </Box>
+            <Box>
+              <Box
+                mt={2}
+                display={["block", null, "flex"]}
+                alignItems="center"
+                color="#9C89F6"
+              >
+                <Flex
+                  px={4}
+                  py={1}
+                  bg="#9C89F6"
+                  color="white"
+                  sx={{ borderRadius: "50px" }}
+                  mb={[4, null, 0]}
+                >
+                  Validators
+                </Flex>
+                <Box flex={1} />
+                {as === "Delegator" ? <Box>Choose Delegatee</Box> : null}
+              </Box>
+              <Box p={4} fontSize="12px">
+                <Flex
+                  bg="white"
+                  sx={{
+                    borderRadius: "5px 5px 0 0",
+                    borderBottom: "1px solid #9C89F6",
+                  }}
+                >
+                  <Box p={2} flex={1}>
+                    Address
+                  </Box>
+                  <Box p={2} w="80px" align="right">
+                    Amount
+                  </Box>
+                  <Box p={2} w="80px" align="right">
+                    Delegated
+                  </Box>
+                </Flex>
+                {map(v => {
+                  return (
+                    <Flex
+                      key={v.addr}
+                      onClick={() => setDelegatee(v.addr)}
+                      sx={{
+                        cursor: "pointer",
+                        ":hover": { opacity: 0.75 },
+                        borderBottom: "1px solid #9C89F6",
+                      }}
+                      align="center"
+                      bg={
+                        as === "Delegator" && delegatee === v.addr ? "#eee" : ""
+                      }
+                    >
+                      <Box p={2} flex={1}>
+                        <Box
+                          sx={{
+                            cursor: "pointer",
+                            ":hover": { opacity: 0.75 },
+                            wordBreak: "break-all",
+                          }}
+                        >
+                          {v.addr}
+                        </Box>
+                      </Box>
+                      <Box w="80px" p={2} fontSize="12px" align="right">
+                        {Math.floor(v.amount / 10 ** 18)}
+                      </Box>
+                      <Box w="80px" p={2} fontSize="12px" align="right">
+                        {Math.floor(v.delegated / 10 ** 18)}
+                      </Box>
+                    </Flex>
+                  )
+                })(validators)}
+              </Box>
+            </Box>
+          </Box>
+        </Flex>
+      )}
     </>
   )
 }

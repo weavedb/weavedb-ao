@@ -267,7 +267,7 @@ class Rollup {
                   hash,
                   zkdb: _zkp,
                 }
-                const { err, mid } = await this.syncer.msg({
+                const { err, mid, res } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
                   data,
@@ -283,9 +283,28 @@ class Rollup {
                   })
                   validity[mid] = true
                   this.hash = _zkp
+                } else if (res.Messages[0]) {
+                  results.push({
+                    hash,
+                    height,
+                    tx: { originalTxId: mid },
+                    items: v,
+                    //duration: result.duration,
+                  })
+                  validity[mid] = true
+                  this.hash = _zkp
                 } else {
                   // [TODO] need to handle this
+                  console.log(data)
                   console.log(err)
+                  console.log(
+                    (
+                      await this.syncer.result({
+                        message: mid,
+                        process: this.contractTxId,
+                      })
+                    ).Messages[0].Tags,
+                  )
                   console.log("something went wrong with bundling")
                 }
               }

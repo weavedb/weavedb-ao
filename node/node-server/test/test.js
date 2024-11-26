@@ -83,7 +83,7 @@ describe("WeaveDB on AO", function () {
       "Transfer",
       {
         Recipient: _stake,
-        Quantity: 1,
+        Quantity: g(1),
         "X-Action": "Add-Node",
         "X-URL": "https://test.wdb.ae",
       },

@@ -263,8 +263,6 @@ class VM {
       if (isAdmin) {
         let {
           op,
-          module,
-          scheduler,
           key,
           db,
           type,
@@ -419,8 +417,6 @@ class VM {
                     "utf8",
                   )
                   const { pid } = await ao.deploy({
-                    module,
-                    scheduler,
                     src_data: data,
                     fills: { BUNDLER: bundler, STAKING: this.conf.staking },
                   })
@@ -437,10 +433,10 @@ class VM {
                           [_db.owner]: "10",
                         },
                         Node: 1,
-                        Price: 1,
+                        Price: "1000000000000",
                         DB: pid,
                         Validators: 2,
-                        "Min-Stake": 1,
+                        "Min-Stake": "1000000000000000000",
                       },
                       { check: "db added!" },
                     )
@@ -449,7 +445,11 @@ class VM {
                     console.log(e)
                   }
                   const tx = await this.admin_db.update(
-                    { contractTxId: pid, type: "ao", srcTxId: module },
+                    {
+                      contractTxId: pid,
+                      type: "ao",
+                      srcTxId: this.conf.aos.module,
+                    },
                     "dbs",
                     key,
                     auth,
@@ -460,14 +460,14 @@ class VM {
                   callback(null, {
                     result: JSON.stringify({
                       contractTxId: pid,
-                      srcTxId: module,
+                      srcTxId: this.conf.aos.module,
                     }),
                     err,
                   })
                   this.txid_map[pid] = key
                   this.rollups[key].deployContract(
                     pid,
-                    module,
+                    this.conf.aos.module,
                     ++this.count,
                     () => {
                       console.log(`AO contract initialized! ${pid}`)
@@ -500,33 +500,6 @@ class VM {
                 result: null,
                 err: `signer [${signer}] does not have enough token`,
               })
-              return
-            }
-            let _err2 = null
-            try {
-              const {
-                out,
-                err: err2,
-                res,
-              } = await ao.msg({
-                pid: this.conf.admin_contract,
-                act: "Transfer",
-                tags: {
-                  Sender: signer,
-                  Recipient: ao.ar.addr,
-                  Quantity: "100000000000000",
-                },
-                get: { obj: { recipient: "Recipient" } },
-              })
-              _err2 = err2
-              if (out.recipient === this.conf.admin_contract)
-                _err2 = "wrong recipient"
-            } catch (e) {
-              _err2 = e
-            }
-            if (_err2) {
-              console.log(_err2)
-              callback(null, { result: null, err: `token transfer failde` })
               return
             }
             if (isNil(key)) {
@@ -581,13 +554,13 @@ class VM {
                 bundler: this.conf.bundler,
                 admin: this.conf.admin,
               })
-              this.rollups[key].init(() => {
+              this.rollups[key].init(async () => {
                 if (db.contractTxId) {
                   this.txid_map[db.contractTxId] = key
                   this.rollups[key].deployContract(
                     db.contractTxId,
                     ++this.count,
-                    () => {
+                    async () => {
                       console.log(`contract initialized! ${db.contractTxId}`)
                       callback(null, {
                         result: tx.success ? JSON.stringify(tx) : null,
@@ -596,6 +569,37 @@ class VM {
                     },
                   )
                 } else {
+                  let _err2 = null
+                  try {
+                    const {
+                      out,
+                      err: err2,
+                      res,
+                    } = await ao.msg({
+                      pid: this.conf.admin_contract,
+                      act: "Transfer",
+                      tags: {
+                        Sender: signer,
+                        Recipient: ao.ar.addr,
+                        Quantity: "100000000000000",
+                      },
+                      get: { obj: { recipient: "Recipient" } },
+                    })
+                    _err2 = err2
+                    if (out.recipient === this.conf.admin_contract)
+                      _err2 = "wrong recipient"
+                  } catch (e) {
+                    _err2 = e
+                  }
+
+                  if (_err2) {
+                    console.log(_err2)
+                    callback(null, {
+                      result: null,
+                      err: `token transfer failed`,
+                    })
+                    return
+                  }
                   callback(null, {
                     result: tx.success ? JSON.stringify(tx) : null,
                     err: tx.success ? null : "error",
