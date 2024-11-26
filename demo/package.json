@@ -21,7 +21,7 @@
     "@emotion/styled": "11.13.0",
     "@simplewebauthn/browser": "^11.0.0",
     "@simplewebauthn/server": "^11.0.0",
-    "aonote": "^0.8.4",
+    "aonote": "^0.10.1",
     "arnext": "^0.1.4",
     "arweave": "^1.15.5",
     "ethers": "^6.13.4",

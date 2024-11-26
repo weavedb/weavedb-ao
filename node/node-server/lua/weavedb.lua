@@ -244,8 +244,6 @@ local function _parser(query)
   return q
 end
 
-
-
 local function get_table_keys(t)
   local keys = {}
   for k in pairs(t) do table.insert(keys, k) end
