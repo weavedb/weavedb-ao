@@ -280,7 +280,7 @@ end
 
 local function matches_filters(doc, filters)
   local id = doc.__id__
-  
+
   -- Handle equals
   for _, filter in ipairs(filters.equals or {}) do
     local field, _, value = table.unpack(filter)
@@ -339,34 +339,39 @@ local function matches_filters(doc, filters)
   return true
 end
 
-local function apply_cursor(docs, cursor, is_start)
-  if not cursor then return docs end
-
+local function apply_cursor(docs, cursor, sort)
+  if not cursor or not sort or not sort[1] then return docs end
+  local field = sort[1]
+  local desc = sort[2] == "desc"
   local op, value = cursor[1], cursor[2]
-  local comparison = nil
+  local cmp = nil
   
   if op == "startAt" then
-    comparison = function(doc) return doc >= value end
-  elseif op == "startAfter" then
-    comparison = function(doc) return doc > value end
-  elseif op == "endAt" then
-    comparison = function(doc) return doc <= value end
-  elseif op == "endBefore" then
-    comparison = function(doc) return doc < value end
-  end
-
-  local result = {}
-  for i, doc in ipairs(docs) do
-    if comparison(is_start and doc or value) then
-      table.insert(result, doc)
+    cmp = function(doc)
+      return desc and doc[field] <= value or doc[field] >= value
     end
+  elseif op == "startAfter" then
+    cmp = function(doc) return doc > value end
+  elseif op == "endAt" then
+    cmp = function(doc) return doc <= value end
+  elseif op == "endBefore" then
+    cmp = function(doc) return doc < value end
   end
   
+  local result = {}
+  local init = false
+  for i, doc in ipairs(docs) do
+    local ok = comp(doc)
+    if cmp(doc) then
+      table.insert(result, doc)
+      init = true
+    end
+    if ok and init then break end
+  end
   return result
 end
 
-
-local function query_data(query)
+local function query_data(query, cget)
   local docs = {}
   local collection = data[query.path[1]]
   local docs = {}
@@ -388,8 +393,8 @@ local function query_data(query)
   local sorted_docs = sort_docs(filtered_docs, query.sort)
 
     -- Apply cursors
-  local cursored_docs = apply_cursor(sorted_docs, query.start, true)
-  cursored_docs = apply_cursor(cursored_docs, query.end_, false)
+  local cursored_docs = apply_cursor(sorted_docs, query.sort, query.start)
+  cursored_docs = apply_cursor(cursored_docs, query.sort, query.end_)
 
   -- Apply limit
   if query.limit and #cursored_docs > query.limit then
@@ -402,7 +407,9 @@ local function query_data(query)
   
   -- Remove injected IDs
   for _, doc in ipairs(cursored_docs) do
+    local id = doc.__id__
     doc.__id__ = nil
+    if cget then  doc = { id = id, data = doc } end
   end
   
   return cursored_docs
@@ -485,6 +492,7 @@ Handlers.add(
   end
 )
 
+
 Handlers.add(
   "Get",
   "Get",
@@ -498,6 +506,24 @@ Handlers.add(
       result = __result
     else
       result = data[query[1]][query[2]]
+    end
+    msg.reply({ Data = json.encode(result) })
+  end
+)
+
+Handlers.add(
+  "Cget",
+  "Cget",
+  function(msg)
+    assert(type(msg.Tags.Query) == 'string', 'Query is required!')
+    local query = json.decode(msg.Tags.Query)
+    local q = _parser(query)
+    local result = nil
+    if #q.path == 1 then
+      local __result = query_data(q, true)
+      result = __result
+    else
+      result = { id = query[2], data = data[query[1]][query[2]], __cursor__ = true }
     end
     msg.reply({ Data = json.encode(result) })
   end

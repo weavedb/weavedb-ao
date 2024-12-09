@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "mocha"
+    "test": "mocha --node-option=experimental-wasm-memory64"
   },
   "dependencies": {
     "aonote": "^0.10.1",
     "chai": "^5.1.1",
     "mocha": "^10.7.3",
     "node-forge": "^1.3.1",
+    "wao": "^0.4.6",
     "yargs": "^17.7.2"
   },
   "devDependencies": {

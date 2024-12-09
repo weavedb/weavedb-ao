@@ -364,7 +364,7 @@ local function apply_cursor(docs, cursor, is_start)
 end
 
 
-local function query_data(query)
+local function query_data(query, cget)
   local docs = {}
   local collection = data[query.path[1]]
   local docs = {}
@@ -400,9 +400,12 @@ local function query_data(query)
   
   -- Remove injected IDs
   for _, doc in ipairs(cursored_docs) do
+    local id = doc.__id__
     doc.__id__ = nil
+    if cget then
+      doc = { id = id, data = doc }
+    end
   end
-  
   return cursored_docs
 end
 
@@ -492,10 +495,26 @@ Handlers.add(
     local q = _parser(query)
     local result = nil
     if #q.path == 1 then
-      local __result = query_data(q)
-      result = __result
+      result = query_data(q)
     else
       result = data[query[1]][query[2]]
+    end
+    msg.reply({ Data = json.encode(result) })
+  end
+)
+
+Handlers.add(
+  "Cget",
+  "Cget",
+  function(msg)
+    assert(type(msg.Tags.Query) == 'string', 'Query is required!')
+    local query = json.decode(msg.Tags.Query)
+    local q = _parser(query)
+    local result = nil
+    if #q.path == 1 then
+      result = query_data(q, true)
+    else
+      result = { id = query[2], data = data[query[1]][query[2]], __cursor__ = true }
     end
     msg.reply({ Data = json.encode(result) })
   end
