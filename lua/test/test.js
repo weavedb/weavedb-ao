@@ -1,6 +1,5 @@
 import { Src, setup, ok, fail } from "aonote/test/helpers.js"
 import { expect } from "chai"
-//import { AR, AO } from "aonote"
 import { AO } from "wao/test"
 import { readFileSync } from "fs"
 import { resolve } from "path"
@@ -107,7 +106,7 @@ describe("WeaveDB", function () {
     ok(await ao.load({ pid, data, fills: { BUNDLER: ao.ar.addr } }))
   })
 
-  it("should deploy weavedb process", async () => {
+  it.only("should deploy weavedb process", async () => {
     const { pid: _stake, p: stake } = await ao2.deploy({
       src_data: src.data("staking_mock"),
     })
@@ -115,6 +114,7 @@ describe("WeaveDB", function () {
       src_data: src.data("weavedb"),
       fills: { BUNDLER: ar.addr, STAKING: _stake },
     })
+
     const { mid: mid1 } = await db.msg("Rollup", {
       data: {
         block_height: 1,
@@ -160,7 +160,6 @@ describe("WeaveDB", function () {
 
     const cget = async (...q) =>
       await db.d("Cget", { Query: JSON.stringify(q) })
-
     await stake.m(
       "Finalize",
       { to: _db, height: 1, txid: mid1 },
@@ -181,11 +180,10 @@ describe("WeaveDB", function () {
     //await wait(3000)
 
     const res0 = await cget("ppl", "Mike") // use this to skip
-    console.log(await q2("ppl", ["age", "desc"], ["endAt", 15]))
-
-    // fix me
-    console.log(await get("ppl", ["age", "desc"], ["startAt", 15]))
+    const resx = await get("ppl", ["age", "desc"], ["endBefore", res0])
+    expect(resx).to.eql([beth])
     const res = await get("ppl", "Bob")
+
     expect(res).to.eql(bob)
 
     expect(await get("ppl")).to.eql([alice, beth, bob, mike])

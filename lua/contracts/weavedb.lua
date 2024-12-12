@@ -341,38 +341,90 @@ end
 
 local function apply_cursor(docs, cursor, sort)
   if not cursor or not sort or not sort[1] then return docs end
-  local field = sort[1]
-  local desc = sort[2] == "desc"
-  local op, value = cursor[1], cursor[2]
+  local field = cursor[1][1]
+  local desc = cursor[1][2] == "desc"
+  local op, value = sort[1], sort[2]
+  local isCursor = (type(value) == "table" and value.__cursor__)
   local cmp = nil
-  
+  local ex = false
   if op == "startAt" then
     cmp = function(doc)
-      return desc and doc[field] <= value or doc[field] >= value
+      if isCursor then
+	if doc.__id__ == value.id then ex = true end
+	return ex
+      else
+	if desc then
+	  return doc[field] <= value
+	else
+	  return doc[field] >= value
+	end
+      end
     end
   elseif op == "startAfter" then
-    cmp = function(doc) return doc > value end
+    cmp = function(doc)
+      if isCursor then
+	if ex == false then
+	  if doc.__id__ == value.id then ex = true end
+	  return false
+	else
+	  return true
+	end
+      else
+	if desc then
+	  return doc[field] < value
+	else
+	  return doc[field] > value
+	end
+      end
+    end
   elseif op == "endAt" then
-    cmp = function(doc) return doc <= value end
+    cmp = function(doc)
+      if isCursor then
+	if ex == false then
+	  if doc.__id__ == value.id then ex = true end
+	  return true
+	else
+	  return ex ~= true
+	end
+      else
+	if desc then
+	  return doc[field] >= value
+	else
+	  return doc[field] <= value
+	end
+      end
+    end
   elseif op == "endBefore" then
-    cmp = function(doc) return doc < value end
+    cmp = function(doc)
+      if isCursor then
+	if doc.__id__ == value.id then ex = true end
+	return ex ~= true
+      else
+	if desc then
+	  return doc[field] > value
+	else
+	  return doc[field] < value
+	end
+      end
+    end
   end
-  
+  if cmp == nil then return { op } end
   local result = {}
   local init = false
   for i, doc in ipairs(docs) do
-    local ok = comp(doc)
-    if cmp(doc) then
+    local ok = cmp(doc)
+    if ok then
       table.insert(result, doc)
       init = true
     end
-    if ok and init then break end
+    if not ok and init then break end
   end
   return result
 end
 
 local function query_data(query, cget)
   local docs = {}
+  data[query.path[1]] = data[query.path[1]] or {}
   local collection = data[query.path[1]]
   local docs = {}
   for id, doc in pairs(collection) do
@@ -392,9 +444,9 @@ local function query_data(query, cget)
   -- Sort
   local sorted_docs = sort_docs(filtered_docs, query.sort)
 
-    -- Apply cursors
-  local cursored_docs = apply_cursor(sorted_docs, query.sort, query.start)
-  cursored_docs = apply_cursor(cursored_docs, query.sort, query.end_)
+  -- Apply cursors
+  local cursored_docs = apply_cursor(sorted_docs, query.sort, query.start or query.startCursor)
+  cursored_docs = apply_cursor(cursored_docs, query.sort, query.end_ or query.endCursor)
 
   -- Apply limit
   if query.limit and #cursored_docs > query.limit then
@@ -491,7 +543,6 @@ Handlers.add(
     msg.reply({ Data = 'finalized!' })
   end
 )
-
 
 Handlers.add(
   "Get",
