@@ -1,6 +1,6 @@
 import { Src, setup, ok, fail } from "aonote/test/helpers.js"
 import { expect } from "chai"
-import { AR, AO } from "aonote"
+import { AO } from "wao/test"
 import { readFileSync } from "fs"
 import { resolve } from "path"
 import forge from "node-forge"
@@ -62,10 +62,13 @@ function to64(x) {
 
 describe("WeaveDB", function () {
   this.timeout(0)
-  let ao, ao2, opt, profile, ar, thumbnail, banner, src, data
+  let ao, ao2, opt, profile, ar, thumbnail, banner, src, data, jwk
 
   before(async () => {
-    ;({ thumbnail, banner, opt, ao, ao2, ar, profile } = await setup({}))
+    //;({ thumbnail, banner, opt, ao, ao2, ar, profile } = await setup({}))
+    ao2 = new AO()
+    await ao2.ar.gen()
+    ar = ao2.ar
     src = new Src({ ar, dir: resolve(import.meta.dirname, "../contracts") })
   })
 
@@ -93,17 +96,17 @@ describe("WeaveDB", function () {
       dq: to64(dQ),
       qi: to64(qInv),
     }
-    const ao = await new AO(opt.ao).init(jwk)
+    const ao = await new AO().init(jwk)
     const data = readFileSync(
       resolve(import.meta.dirname, "../contracts/weavedb.lua"),
       "utf8",
     )
     const { err, pid } = await ao.spwn({})
     await ao.wait({ pid })
-    ok(await ao.load({ pid, data, fills: { BUNDLER: ar.addr } }))
+    ok(await ao.load({ pid, data, fills: { BUNDLER: ao.ar.addr } }))
   })
 
-  it("should deploy weavedb process", async () => {
+  it.only("should deploy weavedb process", async () => {
     const { pid: _stake, p: stake } = await ao2.deploy({
       src_data: src.data("staking_mock"),
     })
@@ -125,7 +128,6 @@ describe("WeaveDB", function () {
       },
       check: "committed!",
     })
-
     const { mid: mid2 } = await db.msg("Rollup", {
       data: {
         block_height: 2,
@@ -152,11 +154,18 @@ describe("WeaveDB", function () {
       },
       check: "committed!",
     })
+    const get = async (...q) => await db.d("Get", { Query: JSON.stringify(q) })
+
+    const q2 = async (...q) => await db.d("Parse", { Query: JSON.stringify(q) })
+
+    const cget = async (...q) =>
+      await db.d("Cget", { Query: JSON.stringify(q) })
     await stake.m(
       "Finalize",
       { to: _db, height: 1, txid: mid1 },
       { check: "finalized!" },
     )
+
     await stake.m(
       "Finalize",
       { to: _db, height: 2, txid: mid2 },
@@ -168,45 +177,40 @@ describe("WeaveDB", function () {
       { check: "finalized!" },
     )
 
-    const q = async (...Query) => {
-      const get = true
-      const tags = { Query: JSON.stringify(Query) }
-      return await db.d("Get", tags)
-    }
-    const q2 = async (...Query) => {
-      const get = true
-      const tags = { Query: JSON.stringify(Query) }
-      return await db.d("Parse", tags)
-    }
-    await wait(3000)
-    const res = await q("ppl", "Bob")
+    //await wait(3000)
+
+    const res0 = await cget("ppl", "Mike") // use this to skip
+    const resx = await get("ppl", ["age", "desc"], ["endBefore", res0])
+    expect(resx).to.eql([beth])
+    const res = await get("ppl", "Bob")
+
     expect(res).to.eql(bob)
-    expect(await q("ppl")).to.eql([alice, beth, bob, mike])
-    expect(await q("ppl", ["age", "desc"])).to.eql([beth, mike, alice, bob])
-    expect(await q("ppl", ["age"], 2)).to.eql([bob, alice])
-    expect(await q("ppl", ["age", "==", 10], 2)).to.eql([alice])
-    expect(await q("ppl", ["age", "desc"], ["age", "in", [10, 20]], 2)).to.eql([
-      beth,
-      alice,
-    ])
+
+    expect(await get("ppl")).to.eql([alice, beth, bob, mike])
+    expect(await get("ppl", ["age", "desc"])).to.eql([beth, mike, alice, bob])
+    expect(await get("ppl", ["age"], 2)).to.eql([bob, alice])
+    expect(await get("ppl", ["age", "==", 10], 2)).to.eql([alice])
+    expect(
+      await get("ppl", ["age", "desc"], ["age", "in", [10, 20]], 2),
+    ).to.eql([beth, alice])
 
     expect(
-      await q("ppl", ["age", "desc"], ["age", "not-in", [10, 20]], 2),
+      await get("ppl", ["age", "desc"], ["age", "not-in", [10, 20]], 2),
     ).to.eql([mike, bob])
 
-    expect(await q("ppl", ["age", "desc"], ["age", "!=", 10])).to.eql([
+    expect(await get("ppl", ["age", "desc"], ["age", "!=", 10])).to.eql([
       beth,
       mike,
       bob,
     ])
 
-    expect(await q("ppl", ["favs", "array-contains", "apple"])).to.eql([
+    expect(await get("ppl", ["favs", "array-contains", "apple"])).to.eql([
       alice,
       bob,
     ])
 
     expect(
-      await q(
+      await get(
         "ppl",
         ["age", "desc"],
         ["favs", "array-contains-any", ["grape", "apple"]],
@@ -260,7 +264,7 @@ describe("WeaveDB", function () {
     return
   })
 
-  it.only("should deploy staking contract", async () => {
+  it("should deploy staking contract", async () => {
     const infra = await ar.gen()
     const validator_1 = await ar.gen()
     const validator_2 = await ar.gen()
@@ -465,7 +469,7 @@ describe("WeaveDB", function () {
       { DB: _wdb, "Delegate-To": validator_1.addr, Quantity: g(1) },
       { jwk: delegator_1.jwk },
     )
-    await wait(2000)
+    //await wait(2000)
     expect(await eth.d("Balance", { Recipient: delegator_1.addr })).to.eql(
       g(10) * 1,
     )
@@ -481,14 +485,14 @@ describe("WeaveDB", function () {
       fills: { PARENT: pid, SOURCE: pid },
     })
     await tdb.m("Transfer", { Recipient: pid2, Quantity: "10" })
-    await wait(3000)
+    //await wait(3000)
     await node.m("Transfer", {
       Sender: ar.addr,
       Recipient: pid2,
       Quantity: "5",
     })
     await node.m("Withdraw", { Quantity: "3" })
-    await wait(3000)
+    //await wait(3000)
     expect((await node.d("Balances"))[ar.addr]).to.eql("2")
     expect((await tdb.d("Balances"))[ar.addr]).to.eql("93")
   })

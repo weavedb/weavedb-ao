@@ -1,10 +1,10 @@
+import { AO } from "wao"
 import { Link, ssr } from "arnext"
 import { useInterval } from "usehooks-ts"
 import QRCode from "react-qr-code"
 import { Html5QrcodeScanner } from "html5-qrcode"
 import SyntaxHighlighter from "react-syntax-highlighter"
 import a11yDark from "../lib/a11y-dark"
-const { AO } = require("aonote")
 const { toIndex, path, encodeQuery } = require("zkjson")
 import { useEffect, useState } from "react"
 import DB from "weavedb-client"
