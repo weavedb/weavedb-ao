@@ -30,6 +30,7 @@ class Test {
     network,
     cosmwasm = false,
     admin_contract,
+    mem,
   }) {
     this.aos = aos
     this.admin_contract = admin_contract
@@ -42,7 +43,7 @@ class Test {
     this.staking = staking
     this.secure = secure
     this.weavedb_srcTxId = weavedb_srcTxId
-    this.weavedb_version = weavedb_version ?? "0.42.1"
+    this.weavedb_version = weavedb_version ?? "0.45.0"
     this.network = network ?? {
       host: "localhost",
       port: 4000,
@@ -52,23 +53,19 @@ class Test {
     this.dbname = dbname ?? `test-${Math.floor(Math.random() * 1000)}`
   }
   async addFunds(wallet, amount = "1000000000000000") {
-    const addr = await this.arweave.wallets.getAddress(wallet)
-    await this.arweave.api.get(`/mint/${addr}/${amount}`)
+    if (!this.aos.mem) {
+      const addr = await this.arweave.wallets.getAddress(wallet)
+      await this.arweave.api.get(`/mint/${addr}/${amount}`)
+    }
   }
   async genBunder() {
-    this.arweave = Arweave.init(this.network)
     if (!this.bundler) {
+      this.arweave = Arweave.init(this.network)
       this.bundler = await this.arweave.wallets.generate()
       await this.addFunds(this.bundler)
     } else {
       console.log("bundler already exists")
       await this.addFunds(this.bundler)
-    }
-    if (!this.bundler2) {
-      this.bundler2 = await this.arweave.wallets.generate()
-      await this.addFunds(this.bundler2)
-    } else {
-      console.log("bundler2 already exists")
     }
   }
   async genAdmin() {
@@ -128,7 +125,6 @@ class Test {
       network: this.network,
       arweave: this.arweave,
       bundler: this.bundler,
-      bundler2: this.bundler2,
       admin: this.admin,
       admin_l1: this.admin_l1,
       contracts: this.contracts,
@@ -166,6 +162,7 @@ class Test {
     this.stopServer()
     await this.stopVM()
     this.deleteCache()
+    setTimeout(() => process.exit(), 100)
   }
 }
 

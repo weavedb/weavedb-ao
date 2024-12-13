@@ -1,7 +1,7 @@
 const { connect } = require("@permaweb/ao-scheduler-utils")
 const { DB: ZKDB } = require("zkjson")
-const { AO } = require("aonote")
 const fs = require("fs")
+const { Connected } = require("./connection")
 const { cpSync, rmSync } = require("fs")
 const {
   uniq,
@@ -27,7 +27,7 @@ const path = require("path")
 const EthCrypto = require("eth-crypto")
 let arweave = require("arweave")
 const { fork } = require("child_process")
-
+let AO = null
 const getId = async (contractTxId, input, timestamp) => {
   const str = JSON.stringify({
     contractTxId,
@@ -82,6 +82,13 @@ class Rollup {
     snapshot,
     type = "warp",
   }) {
+    if (aos?.mem) {
+      const { AO: TAO } = require("wao/test")
+      AO = TAO
+    } else {
+      const { AO: MAO } = require("wao")
+      AO = MAO
+    }
     this.hash = null
     this.snapshot = snapshot
     this.cb = {}
@@ -333,15 +340,18 @@ class Rollup {
   async bundle() {
     let done = false
     let recovery = false
-    setTimeout(() => {
-      if (!done) {
-        recovery = true
-        console.log("this must be stuck....")
-        this.init_warp = false
-        this.initSyncer()
-        this.bundle()
-      }
-    }, 20000)
+    setTimeout(
+      () => {
+        if (!done) {
+          recovery = true
+          console.log("this must be stuck....")
+          this.init_warp = false
+          this.initSyncer()
+          this.bundle()
+        }
+      },
+      this.aos?.mem ? 2000 : 20000,
+    )
     let { err, success, len, results, state } = await this._bundle()
     done = true
     if (recovery) console.log("this process is aborted!")
@@ -614,18 +624,21 @@ class Rollup {
         console.log("srcTxId is missing...", this.contractTxId)
         return
       }
-
       this.syncer = await new AO(this.aos).init(this.bundler)
       // we need recovery here....read tx from SU
-      console.log("recovery...........................", this.contractTxId)
-      let opt = {}
-      if (!isNil(this.aos?.aoconnect?.GATEWAY_URL)) {
-        opt.GRAPHQL_URL = `${this.aos.aoconnect.GATEWAY_URL}/graphql`
+      let res = { error: true }
+      if (this.aos.mem) {
+        res = { edges: [] }
+      } else {
+        let opt = {}
+        if (!isNil(this.aos?.aoconnect?.GATEWAY_URL)) {
+          opt.GRAPHQL_URL = `${this.aos.aoconnect.GATEWAY_URL}/graphql`
+        }
+        const { validate, locate, raw } = connect(opt)
+        let { url, address } = await locate(this.contractTxId)
+        if (url === "http://su") url = "http://localhost:4003"
+        res = await fetch(`${url}/${this.contractTxId}`).then(r => r.json())
       }
-      const { validate, locate, raw } = connect(opt)
-      let { url, address } = await locate(this.contractTxId)
-      if (url === "http://su") url = "http://localhost:4003"
-      const res = await fetch(`${url}/${this.contractTxId}`).then(r => r.json())
       if (res.error) {
         console.log(res.error)
       } else {
@@ -955,46 +968,59 @@ class Rollup {
   }
 }
 
-let rollup
-process.on("message", async msg => {
-  const { op, id } = msg
-  if (op === "new") {
-    rollup = new Rollup(msg.params)
-  } else if (op === "init") {
-    await rollup.init()
-    process.send({ err: null, result: null, op, id })
-  } else if (op === "execUser") {
-    rollup.execUser({
-      ...msg.params,
-      res: (err, result) => process.send({ err, result, op, id }),
-    })
-  } else if (op === "deploy_contract") {
-    rollup.type = msg.type
-    rollup.ao = msg.ao
-    rollup.contractTxId = msg.contractTxId
-    rollup.last_hash = msg.contractTxId
-    rollup.db.contractTxId = msg.contractTxId
-    rollup.rollup = true
-    rollup.srcTxId = msg.srcTxId
-    await rollup.initWarp()
-    rollup.bundle()
-    process.send({ op, id })
-  } else if (op === "hash") {
-    process.send({ op, id, result: { hash: rollup.hash } })
-  } else if (op === "zkp") {
-    const { err, zkp, col_id } = await rollup.genZKP(
-      msg.collection,
-      msg.doc,
-      msg.path,
-      msg.query,
-    )
-    process.send({
-      op,
-      id,
-      err,
-      result: { zkp, col_id },
-    })
-  } else {
-    process.send({ op, id })
+class RNode {
+  constructor() {
+    this.rollup = null
+    this.funcs = {
+      _: ({ op, id, send }) => send({ op, id }),
+      new: ({ op, id, msg, send }) => {
+        this.rollup = new Rollup(msg.params)
+      },
+      init: async ({ op, id, msg, send }) => {
+        await this.rollup.init()
+        send({ err: null, result: null, op, id })
+      },
+      execUser: async ({ op, id, msg, send }) => {
+        this.rollup.execUser({
+          ...msg.params,
+          res: (err, result) => send({ err, result, op, id }),
+        })
+      },
+      deploy_contract: async ({ msg, send, op, id }) => {
+        this.rollup.type = msg.type
+        this.rollup.ao = msg.ao
+        this.rollup.contractTxId = msg.contractTxId
+        this.rollup.last_hash = msg.contractTxId
+        this.rollup.db.contractTxId = msg.contractTxId
+        this.rollup.rollup = true
+        this.rollup.srcTxId = msg.srcTxId
+        await this.rollup.initWarp()
+        this.rollup.bundle()
+        this.send({ op, id })
+      },
+      hash: async ({ msg, send, op, id }) => {
+        send({ op, id, result: { hash: this.rollup.hash } })
+      },
+      zkp: async ({ msg, send, op, id }) => {
+        const { err, zkp, col_id } = await this.rollup.genZKP(
+          msg.collection,
+          msg.doc,
+          msg.path,
+          msg.query,
+        )
+        send({
+          op,
+          id,
+          err,
+          result: { zkp, col_id },
+        })
+      },
+    }
   }
-})
+}
+
+const rnode = new RNode()
+
+new Connected({ parent: process, funcs: rnode.funcs })
+
+module.exports = RNode

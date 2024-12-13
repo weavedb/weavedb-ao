@@ -11,6 +11,7 @@ const winston = "000000000000"
 const gewi = "000000000000000000"
 const w = n => Number(n).toString() + winston
 const g = n => Number(n).toString() + gewi
+const { AO, ArMem, acc, modules, scheduler } = require("wao/test")
 
 describe("WeaveDB on AO", function () {
   this.timeout(0)
@@ -31,10 +32,13 @@ describe("WeaveDB on AO", function () {
     stake,
     eth,
     _eth,
-    _db
+    _db,
+    mem
 
   before(async () => {
-    ;({ ar, ao2, opt } = await setup({}))
+    ao2 = await new AO().init(acc[0].jwk)
+    mem = ao2.mem
+    ar = ao2.ar
     src = new Src({
       ar,
       dir: resolve(__dirname, "../../../lua/contracts"),
@@ -55,20 +59,19 @@ describe("WeaveDB on AO", function () {
         fills: { DB: _db, TOKEN: _eth },
       }),
     ))
-    test = new Test({
+    const opt = {
       ao: true,
       secure: false,
       staking: _stake,
       admin_contract,
-      bundler: ar.jwk,
-      aos: opt.ao2,
-    })
+      bundler: ao2.ar.jwk,
+      aos: { mem, module: mem.modules.aos2_0_1 },
+    }
+    test = new Test(opt)
     ;({ network, arweave, bundler, admin, base } = await test.start())
-    await wait(3000)
   })
 
   after(async () => await test.stop())
-
   it("should deploy weavedb on AO", async () => {
     const { addr, jwk } = await ar.gen()
     const validator_1 = await ar.gen()
@@ -95,7 +98,7 @@ describe("WeaveDB on AO", function () {
       { Recipient: admin_contract, Quantity: w(200) },
       { jwk },
     )
-    await wait(3000)
+    //await wait(3000)
     expect((await node.d("Balances"))[addr]).to.eql("200" + winston)
     expect(await node.d("Info", "Name")).to.eql("Testnet WDB")
     const db = new DB({
@@ -103,9 +106,10 @@ describe("WeaveDB on AO", function () {
       contractTxId: "testdb",
       arweave: network,
     })
-    await wait(2000)
+    //await wait(2000)
     const stats = await db.node({ op: "stats" })
     expect(stats).to.eql({ dbs: [], bundler: ao2.ar.addr })
+
     // add a DB to node
     const tx = await db.admin(
       {
@@ -123,8 +127,6 @@ describe("WeaveDB on AO", function () {
         op: "deploy_contract",
         key: "testdb",
         type: "ao",
-        module: opt.modules.aos2,
-        scheduler: opt.ao2.scheduler,
       },
       { ar2: jwk },
     )
@@ -134,13 +136,13 @@ describe("WeaveDB on AO", function () {
       Quantity: w(1000),
       "X-DB": contractTxId,
     })
-    await wait(5000)
+    //await wait(5000)
     expect((await node.d("Balances"))[addr]).to.eql("100" + winston)
     await token.m(
       "Transfer",
       {
         Recipient: _stake,
-        Quantity: 100,
+        Quantity: w(100),
         "X-Duration": 300000,
         "X-Action": "Set-Reward",
       },
@@ -150,7 +152,7 @@ describe("WeaveDB on AO", function () {
       "Transfer",
       {
         Recipient: _stake,
-        Quantity: 1,
+        Quantity: g(1),
         "X-DB": contractTxId,
       },
       { check: /transferred/, jwk: validator_1.jwk },
@@ -159,7 +161,7 @@ describe("WeaveDB on AO", function () {
       "Transfer",
       {
         Recipient: _stake,
-        Quantity: 1,
+        Quantity: g(1),
         "X-DB": contractTxId,
       },
       { check: /transferred/, jwk: validator_2.jwk },
@@ -175,15 +177,17 @@ describe("WeaveDB on AO", function () {
     expect(await db2.get("ppl", "Bob")).to.eql(Bob)
 
     // check rollup
-    await wait(15000)
-
+    await wait(5000)
+    //await wait(15000)
     const wdb = ao2.p(contractTxId)
     const block = await wdb.d("Get-Next-Block")
+
     let mid = null
     for (const k in block.candidates) {
       mid = k
       break
     }
+
     // validate
     await stake.m(
       "Validate",
@@ -196,7 +200,7 @@ describe("WeaveDB on AO", function () {
       { DB: contractTxId, Block: 1, ["TxID"]: mid },
       { check: "finalized!", jwk: validator_2.jwk },
     )
-    await wait(3000)
+    //await wait(3000)
     expect(
       await wdb.d("Get", { Query: JSON.stringify(["ppl", "Bob"]) }),
     ).to.eql(Bob)
