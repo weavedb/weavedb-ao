@@ -2160,10 +2160,10 @@ vlq@^2.0.4:
   resolved "https://registry.npmjs.org/vlq/-/vlq-2.0.4.tgz"
   integrity sha512-aodjPa2wPQFkra1G8CzJBTHXhgk3EVSwxSWXNPr1fgdFLUb8kvLV1iEb6rFgasIsjP82HWI6dsb5Io26DDnasA==
 
-wao@^0.4.9:
-  version "0.4.9"
-  resolved "https://registry.yarnpkg.com/wao/-/wao-0.4.9.tgz#b9ca996219fe3ce778415373b38503157f3bad60"
-  integrity sha512-DmuBtIDCR2x8XAdkwuogpQCO1QvxvRfmJHEyqTTkTjcAEPKgizjBA92VVw16TbUjN7LuuS/8hA8gTFxa6VJ+NA==
+wao@^0.4.10:
+  version "0.4.10"
+  resolved "https://registry.yarnpkg.com/wao/-/wao-0.4.10.tgz#2ae10ca980424b75f52ed9e5912034ce4624e0e0"
+  integrity sha512-Vv5PrTvCHPmtVRE2tE4pNY2i0KcebupUB97Vwbq+yCbIPUyR1gwiNa9+2geTb2+GxWf66Xgc96jpQl0mq+cR3w==
   dependencies:
     "@babel/plugin-transform-modules-commonjs" "^7.24.8"
     "@permaweb/ao-loader" "^0.0.43"

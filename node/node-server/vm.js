@@ -5,8 +5,8 @@ const { validate } = require("./lib/validate")
 const Snapshot = require("./lib/snapshot")
 const { readFileSync } = require("fs")
 const { resolve } = require("path")
-const { AO } = require("aonote")
-
+const RNode = require("./rollup")
+let AO = null
 const {
   all,
   indexBy,
@@ -22,6 +22,8 @@ const {
 const { privateToAddress } = require("ethereumjs-util")
 const path = require("path")
 const { fork } = require("child_process")
+
+const { Connect, Connected } = require("./connection")
 
 class Rollup {
   constructor({
@@ -48,87 +50,77 @@ class Rollup {
   }) {
     this.cb = {}
     this.txid = txid
-    this.db = fork(path.resolve(__dirname, "rollup"))
-    this.db.on("message", async ({ err, result, op, id }) => {
-      if (!isNil(id)) {
-        await this.cb[id]?.(err, result)
-        delete this.cb[id]
-      } else if (op === "init") {
-        if (is(Function, this.afterInit)) this.afterInit()
-      }
+    const rnode = new RNode()
+    const c = new Connected({ funcs: rnode.funcs })
+    this.db = new Connect({
+      //c: fork(path.resolve(__dirname, "rollup")),
+      c,
+      setParent: true,
+      op: "new",
+      params: {
+        aos,
+        type,
+        snapshot,
+        srcTxId,
+        sequencerUrl,
+        apiKey,
+        arweave,
+        txid,
+        secure,
+        owner,
+        dbname,
+        dir,
+        plugins,
+        tick,
+        admin,
+        initial_state,
+        bundler,
+        contractTxId,
+        rollup,
+      },
     })
+  }
+  init(afterInit) {
+    this.db.to({ op: "init", cb: afterInit })
+  }
+  execUser(parsed) {
+    const cb = parsed.res
+    delete parsed.res
     try {
-      this.db.send({
-        op: "new",
-        params: {
-          aos,
-          type,
-          snapshot,
-          srcTxId,
-          sequencerUrl,
-          apiKey,
-          arweave,
-          txid,
-          secure,
-          owner,
-          dbname,
-          dir,
-          plugins,
-          tick,
-          admin,
-          initial_state,
-          bundler,
-          contractTxId,
-          rollup,
-        },
+      this.db.to({ op: "execUser", params: { params: parsed }, cb })
+    } catch (e) {
+      console.log(e)
+    }
+  }
+  hash(res) {
+    try {
+      this.db.to({ op: "hash", cb: res })
+    } catch (e) {
+      console.log(e)
+    }
+  }
+  zkp(collection, doc, path, query, res) {
+    try {
+      this.db.to({
+        op: "zkp",
+        params: { collection, doc, path, query },
+        cb: res,
       })
     } catch (e) {
       console.log(e)
     }
   }
-  init(afterInit) {
-    this.afterInit = afterInit
+  deployContract(contractTxId, srcTxId, res, type = "warp", ao) {
     try {
-      this.db.send({ op: "init" })
-    } catch (e) {
-      console.log(e)
-    }
-  }
-  execUser(parsed, id) {
-    this.cb[id] = parsed.res
-    delete parsed.res
-    try {
-      this.db.send({ op: "execUser", params: parsed, id })
-    } catch (e) {
-      console.log(e)
-    }
-  }
-  hash(id, res) {
-    this.cb[id] = res
-    try {
-      this.db.send({ op: "hash", id })
-    } catch (e) {
-      console.log(e)
-    }
-  }
-  zkp(collection, doc, path, query, id, res) {
-    this.cb[id] = res
-    try {
-      this.db.send({ op: "zkp", id, collection, doc, path, query })
-    } catch (e) {
-      console.log(e)
-    }
-  }
-  deployContract(contractTxId, srcTxId, id, res, type = "warp", ao) {
-    this.cb[id] = res
-    try {
-      this.db.send({
+      this.db.to({
+        cb: res,
         op: "deploy_contract",
-        contractTxId,
-        srcTxId,
-        id,
-        type,
-        ao,
+        params: {
+          type,
+          contractTxId,
+          srcTxId,
+          ao,
+        },
       })
     } catch (e) {
       console.log(e)
@@ -141,7 +133,13 @@ class Rollup {
 
 class VM {
   constructor({ dbname, conf }) {
-    this.count = 0
+    if (conf.aos?.mem) {
+      const { AO: TAO } = require("wao/test")
+      AO = TAO
+    } else {
+      const { AO: MAO } = require("wao")
+      AO = MAO
+    }
     this.conf = conf
     if (!isNil(dbname)) this.conf.dbname = dbname
     // TODO: more prisice validations
@@ -223,7 +221,7 @@ class VM {
           await this.checkSnapShot({ dbname, dir, contractTxId })
         }
         this.rollups[k] = this.getRollup(ru, k)
-        this.rollups[k].init()
+        this.rollups[k].init(() => {})
       }
     })
   }
@@ -304,22 +302,15 @@ class VM {
 
             break
           case "zkp":
-            this.rollups[key].zkp(
-              collection,
-              doc,
-              path,
-              query2,
-              ++this.count,
-              (err, res) => {
-                callback(null, {
-                  result: JSON.stringify({ zkp: res.zkp, col_id: res.col_id }),
-                  err: null,
-                })
-              },
-            )
+            this.rollups[key].zkp(collection, doc, path, query2, (err, res) => {
+              callback(null, {
+                result: JSON.stringify({ zkp: res.zkp, col_id: res.col_id }),
+                err: null,
+              })
+            })
             break
           case "hash":
-            this.rollups[key].hash(++this.count, (err, res) => {
+            this.rollups[key].hash((err, res) => {
               callback(null, {
                 result: JSON.stringify({ hash: res.hash }),
                 err: null,
@@ -413,14 +404,12 @@ class VM {
                   const ao = await new AO(this.conf.aos).init(this.conf.bundler)
                   const data = readFileSync(
                     resolve(__dirname, "./lua/weavedb.lua"),
-                    //resolve(__dirname, "../../lua/contracts/weavedb.lua"),
                     "utf8",
                   )
                   const { pid } = await ao.deploy({
                     src_data: data,
                     fills: { BUNDLER: bundler, STAKING: this.conf.staking },
                   })
-                  console.log("deployed...", pid)
                   const stake = ao.p(this.conf.staking)
                   try {
                     await stake.m(
@@ -468,7 +457,6 @@ class VM {
                   this.rollups[key].deployContract(
                     pid,
                     this.conf.aos.module,
-                    ++this.count,
                     () => {
                       console.log(`AO contract initialized! ${pid}`)
                     },
@@ -559,7 +547,6 @@ class VM {
                   this.txid_map[db.contractTxId] = key
                   this.rollups[key].deployContract(
                     db.contractTxId,
-                    ++this.count,
                     async () => {
                       console.log(`contract initialized! ${db.contractTxId}`)
                       callback(null, {
@@ -672,7 +659,7 @@ class VM {
           res(`DB [${txid}] doesn't exist`, null)
           return
         }
-        this.rollups[this.txid_map[txid] ?? txid].execUser(parsed, ++this.count)
+        this.rollups[this.txid_map[txid] ?? txid].execUser(parsed)
       }
     } catch (e) {
       console.log(e)
@@ -716,7 +703,7 @@ class VM {
       res(`DB [${txid}] doesn't exist`, null)
       return
     }
-    this.rollups[txid].execUser(parsed, ++this.count)
+    this.rollups[txid].execUser(parsed)
   }
 
   async stop() {

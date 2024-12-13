@@ -244,6 +244,8 @@ local function _parser(query)
   return q
 end
 
+
+
 local function get_table_keys(t)
   local keys = {}
   for k in pairs(t) do table.insert(keys, k) end
@@ -278,7 +280,7 @@ end
 
 local function matches_filters(doc, filters)
   local id = doc.__id__
-  
+
   -- Handle equals
   for _, filter in ipairs(filters.equals or {}) do
     local field, _, value = table.unpack(filter)
@@ -337,35 +339,92 @@ local function matches_filters(doc, filters)
   return true
 end
 
-local function apply_cursor(docs, cursor, is_start)
-  if not cursor then return docs end
-
-  local op, value = cursor[1], cursor[2]
-  local comparison = nil
-  
+local function apply_cursor(docs, cursor, sort)
+  if not cursor or not sort or not sort[1] then return docs end
+  local field = cursor[1][1]
+  local desc = cursor[1][2] == "desc"
+  local op, value = sort[1], sort[2]
+  local isCursor = (type(value) == "table" and value.__cursor__)
+  local cmp = nil
+  local ex = false
   if op == "startAt" then
-    comparison = function(doc) return doc >= value end
+    cmp = function(doc)
+      if isCursor then
+	if doc.__id__ == value.id then ex = true end
+	return ex
+      else
+	if desc then
+	  return doc[field] <= value
+	else
+	  return doc[field] >= value
+	end
+      end
+    end
   elseif op == "startAfter" then
-    comparison = function(doc) return doc > value end
+    cmp = function(doc)
+      if isCursor then
+	if ex == false then
+	  if doc.__id__ == value.id then ex = true end
+	  return false
+	else
+	  return true
+	end
+      else
+	if desc then
+	  return doc[field] < value
+	else
+	  return doc[field] > value
+	end
+      end
+    end
   elseif op == "endAt" then
-    comparison = function(doc) return doc <= value end
+    cmp = function(doc)
+      if isCursor then
+	if ex == false then
+	  if doc.__id__ == value.id then ex = true end
+	  return true
+	else
+	  return ex ~= true
+	end
+      else
+	if desc then
+	  return doc[field] >= value
+	else
+	  return doc[field] <= value
+	end
+      end
+    end
   elseif op == "endBefore" then
-    comparison = function(doc) return doc < value end
-  end
-
-  local result = {}
-  for i, doc in ipairs(docs) do
-    if comparison(is_start and doc or value) then
-      table.insert(result, doc)
+    cmp = function(doc)
+      if isCursor then
+	if doc.__id__ == value.id then ex = true end
+	return ex ~= true
+      else
+	if desc then
+	  return doc[field] > value
+	else
+	  return doc[field] < value
+	end
+      end
     end
   end
-  
+  if cmp == nil then return { op } end
+  local result = {}
+  local init = false
+  for i, doc in ipairs(docs) do
+    local ok = cmp(doc)
+    if ok then
+      table.insert(result, doc)
+      init = true
+    end
+    if not ok and init then break end
+  end
   return result
 end
 
-
 local function query_data(query, cget)
   local docs = {}
+  data[query.path[1]] = data[query.path[1]] or {}
   local collection = data[query.path[1]]
   local docs = {}
   for id, doc in pairs(collection) do
@@ -385,9 +444,9 @@ local function query_data(query, cget)
   -- Sort
   local sorted_docs = sort_docs(filtered_docs, query.sort)
 
-    -- Apply cursors
-  local cursored_docs = apply_cursor(sorted_docs, query.start, true)
-  cursored_docs = apply_cursor(cursored_docs, query.end_, false)
+  -- Apply cursors
+  local cursored_docs = apply_cursor(sorted_docs, query.sort, query.start or query.startCursor)
+  cursored_docs = apply_cursor(cursored_docs, query.sort, query.end_ or query.endCursor)
 
   -- Apply limit
   if query.limit and #cursored_docs > query.limit then
@@ -402,10 +461,9 @@ local function query_data(query, cget)
   for _, doc in ipairs(cursored_docs) do
     local id = doc.__id__
     doc.__id__ = nil
-    if cget then
-      doc = { id = id, data = doc }
-    end
+    if cget then  doc = { id = id, data = doc } end
   end
+  
   return cursored_docs
 end
 
@@ -495,7 +553,8 @@ Handlers.add(
     local q = _parser(query)
     local result = nil
     if #q.path == 1 then
-      result = query_data(q)
+      local __result = query_data(q)
+      result = __result
     else
       result = data[query[1]][query[2]]
     end
@@ -512,7 +571,8 @@ Handlers.add(
     local q = _parser(query)
     local result = nil
     if #q.path == 1 then
-      result = query_data(q, true)
+      local __result = query_data(q, true)
+      result = __result
     else
       result = { id = query[2], data = data[query[1]][query[2]], __cursor__ = true }
     end

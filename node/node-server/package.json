@@ -6,7 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "mocha",
+    "test": "mocha --node-option=experimental-wasm-memory64",
     "codegen": "grpc_tools_node_protoc --js_out=import_style=commonjs,binary:./static_codegen/ --grpc_out=./static_codegen/ --descriptor_set_out=./static_codegen/descriptor_set.bin --include_imports --plugin=protoc-gen-grpc=`which grpc_tools_node_protoc_plugin`  weavedb.proto",
     "dev": "node-dev --respawn server.js",
     "prettier": "prettier *.js --write"
@@ -34,6 +34,7 @@
     "nostr-tools": "^1.16.0",
     "pm2": "^5.3.0",
     "ramda": "^0.28.0",
+    "wao": "^0.4.11",
     "weavedb-node-client": "^0.45.2",
     "weavedb-offchain": "^0.45.3",
     "weavedb-sdk-node": "^0.45.2",
