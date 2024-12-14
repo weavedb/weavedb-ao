@@ -26,7 +26,6 @@ const { open } = require("lmdb")
 const path = require("path")
 const EthCrypto = require("eth-crypto")
 let arweave = require("arweave")
-const { fork } = require("child_process")
 let AO = null
 const getId = async (contractTxId, input, timestamp) => {
   const str = JSON.stringify({
@@ -240,7 +239,7 @@ class Rollup {
                 if (diffs.length > 0) {
                   for (const v of diffs) {
                     let col_id = this.cols[v.collection]
-                    if (!col_id) {
+                    if (isNil(col_id)) {
                       col_id = await this.zkdb.addCollection()
                       this.cols[v.collection] = col_id
                     }

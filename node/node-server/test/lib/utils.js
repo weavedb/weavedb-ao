@@ -24,6 +24,7 @@ class Test {
     weavedb_srcTxId,
     dbname,
     bundler,
+    validators,
     staking,
     admin,
     admin_l1,
@@ -40,6 +41,7 @@ class Test {
     this.admin = admin
     this.admin_l1 = admin_l1
     this.bundler = bundler
+    this.validators = validators
     this.staking = staking
     this.secure = secure
     this.weavedb_srcTxId = weavedb_srcTxId
@@ -96,6 +98,7 @@ class Test {
       admin: this.admin.privateKey,
       admin_l1: this.admin_l1.privateKey,
       bundler: this.bundler,
+      validators: this.validators,
       staking: this.staking,
       rollups: {},
       contracts: this.contracts,

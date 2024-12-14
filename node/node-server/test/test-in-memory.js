@@ -33,7 +33,9 @@ describe("WeaveDB on AO", function () {
     eth,
     _eth,
     _db,
-    mem
+    mem,
+    validator_1,
+    validator_2
 
   before(async () => {
     ao2 = await new AO().init(acc[0].jwk)
@@ -59,7 +61,10 @@ describe("WeaveDB on AO", function () {
         fills: { DB: _db, TOKEN: _eth },
       }),
     ))
+    validator_1 = await ao2.ar.gen()
+    validator_2 = await ao2.ar.gen()
     const opt = {
+      validators: [validator_1.jwk, validator_2.jwk],
       ao: true,
       secure: false,
       staking: _stake,
@@ -74,9 +79,6 @@ describe("WeaveDB on AO", function () {
   after(async () => await test.stop())
   it("should deploy weavedb on AO", async () => {
     const { addr, jwk } = await ar.gen()
-    const validator_1 = await ar.gen()
-    const validator_2 = await ar.gen()
-
     await token.m("Mint", { Quantity: w(10000) })
     await eth.m("Mint", { Quantity: g(10000) })
     await eth.m("Transfer", { Recipient: validator_1.addr, Quantity: g(10) })
@@ -167,9 +169,25 @@ describe("WeaveDB on AO", function () {
       { check: /transferred/, jwk: validator_2.jwk },
     )
 
+    await db.admin(
+      {
+        op: "add_validator",
+        pid: contractTxId,
+      },
+      { ar2: validator_1.jwk },
+    )
+    await db.admin(
+      {
+        op: "add_validator",
+        pid: contractTxId,
+      },
+      { ar2: validator_2.jwk },
+    )
+
     // update the DB (via node)
     const db2 = new DB({ rpc: "localhost:9090", contractTxId })
     const Bob = { name: "Bob" }
+
     const tx2 = await db2.set(Bob, "ppl", "Bob", {
       privateKey: admin.privateKey,
     })
@@ -177,33 +195,22 @@ describe("WeaveDB on AO", function () {
     expect(await db2.get("ppl", "Bob")).to.eql(Bob)
 
     // check rollup
-    await wait(5000)
-    //await wait(15000)
+    await wait(7000)
     const wdb = ao2.p(contractTxId)
-    const block = await wdb.d("Get-Next-Block")
-
-    let mid = null
-    for (const k in block.candidates) {
-      mid = k
-      break
-    }
-
-    // validate
-    await stake.m(
-      "Validate",
-      { DB: contractTxId, Block: 1, ["TxID"]: mid },
-      { check: "validated!", jwk: validator_1.jwk },
-    )
-
-    await stake.m(
-      "Validate",
-      { DB: contractTxId, Block: 1, ["TxID"]: mid },
-      { check: "finalized!", jwk: validator_2.jwk },
-    )
-    //await wait(3000)
     expect(
       await wdb.d("Get", { Query: JSON.stringify(["ppl", "Bob"]) }),
     ).to.eql(Bob)
+
+    const Alice = { name: "Alice" }
+    const tx3 = await db2.set(Alice, "ppl", "Alice", {
+      privateKey: admin.privateKey,
+    })
+    expect(tx3.success).to.eql(true)
+    expect(await db2.get("ppl", "Alice")).to.eql(Alice)
+    await wait(7000)
+    expect(
+      await wdb.d("Get", { Query: JSON.stringify(["ppl", "Alice"]) }),
+    ).to.eql(Alice)
 
     // check zkp
     let hash = null
