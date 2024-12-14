@@ -6,6 +6,7 @@ const Snapshot = require("./lib/snapshot")
 const { readFileSync } = require("fs")
 const { resolve } = require("path")
 const RNode = require("./rollup")
+const VNode = require("./validator")
 let AO = null
 const {
   all,
@@ -24,6 +25,28 @@ const path = require("path")
 const { fork } = require("child_process")
 
 const { Connect, Connected } = require("./connection")
+
+class Validator {
+  constructor(params) {
+    this.cb = {}
+    const vnode = new VNode()
+    const c = params.aos.mem
+      ? new Connected({ funcs: vnode.funcs })
+      : fork(path.resolve(__dirname, "validator"))
+    this.db = new Connect({
+      c,
+      setParent: true,
+      op: "new",
+      params,
+    })
+  }
+  init(afterInit) {
+    this.db.to({ op: "init", cb: afterInit })
+  }
+  kill() {
+    this.db.kill()
+  }
+}
 
 class Rollup {
   constructor({
@@ -51,9 +74,10 @@ class Rollup {
     this.cb = {}
     this.txid = txid
     const rnode = new RNode()
-    const c = new Connected({ funcs: rnode.funcs })
+    const c = aos.mem
+      ? new Connected({ funcs: rnode.funcs })
+      : fork(path.resolve(__dirname, "rollup"))
     this.db = new Connect({
-      //c: fork(path.resolve(__dirname, "rollup")),
       c,
       setParent: true,
       op: "new",
@@ -198,7 +222,8 @@ class VM {
       ]
       // we dont' need to set rules every time we start it out
       const tx = await this.admin_db.setRules(rules, "dbs", auth)
-      console.log(`__admin__ rules added: ${tx.success}`)
+      const tx2 = await this.admin_db.setRules(rules, "validators", auth)
+      console.log(`__admin__ rules added: ${tx.success}: ${tx2.success}`)
       const rollups = this.conf.rollups || { offchain: {} }
       const dbs = indexBy(prop("id"), await this.admin_db.cget("dbs"))
       for (let k in rollups) {
@@ -267,11 +292,46 @@ class VM {
           collection,
           doc,
           path,
+          pid,
           query: query2,
         } = JSON.parse(query).query
         const auth = { privateKey: this.conf.admin }
         let err, signer
         switch (op) {
+          case "add_validator":
+            ;({ err, signer } = await validate(JSON.parse(query), txid))
+            const ao2 = new AO(this.conf.aos)
+            let validator = null
+            let validator_addr = null
+            for (let v of this.conf.validators ?? []) {
+              if ((await ao2.ar.toAddr(v)) === signer) {
+                validator = v
+                validator_addr = signer
+              }
+            }
+            const val = await this.admin_db.get("validators", signer)
+            if (val?.dbs?.[txid]) callback("already exists")
+            else {
+              console.log("lets go:", txid)
+              const _val = new Validator({
+                staking: this.conf.staking,
+                aos: this.conf.aos,
+                pid,
+                addr: validator_addr,
+                jwk: validator,
+              })
+              await this.admin_db.upsert(
+                { addr: signer, dbs: this.admin_db.union([txid]) },
+                "validators",
+                signer,
+                auth,
+              )
+              console.log(await this.admin_db.get("validators", signer))
+              callback(null, {
+                result: JSON.stringify({ validator: validator_addr }),
+              })
+            }
+            break
           case "stats":
             const _arweave = this.conf.arweave ?? {
               host: "arweave.net",
