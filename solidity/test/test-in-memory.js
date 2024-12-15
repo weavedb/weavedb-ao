@@ -1,21 +1,59 @@
+const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers")
+const { toIndex, path } = require("zkjson")
+const { resolve } = require("path")
 const { expect } = require("chai")
+const { wait, Test } = require("../../node/node-server/test/lib/utils")
+const { readFileSync } = require("fs")
 const DB = require("weavedb-node-client")
 const SDK = require("weavedb-sdk-node")
-const { wait, Test } = require("./lib/utils")
-const { readFileSync } = require("fs")
-const { resolve } = require("path")
-const { Src, ok, fail } = require("./lib/helpers.js")
+const { ok, fail, Src } = require("../../node/node-server/test/lib/helpers.js")
+const { AO, ArMem, acc, modules } = require("wao/test")
+const EthCrypto = require("eth-crypto")
 
-const getModule = async () => readFileSync(resolve(__dirname, "../contract.js"))
+const getModule = async () =>
+  readFileSync(resolve(__dirname, "../../node/node-server/contract.js"))
+
+async function deploy() {
+  const signer = await ethers.getSigners()
+  const committer2 = EthCrypto.createIdentity()
+  const committer = new ethers.Wallet(committer2.privateKey) //await ethers.getSigners()
+  const tx = await signer[0].sendTransaction({
+    to: committer2.address,
+    value: ethers.utils.parseEther("1"),
+  })
+  console.log(tx)
+  const VerifierRU = await ethers.getContractFactory("Groth16VerifierRU")
+  const verifierRU = await VerifierRU.deploy()
+  const VerifierDB = await ethers.getContractFactory("Groth16VerifierDB")
+  const verifierDB = await VerifierDB.deploy()
+
+  const MyRU = await ethers.getContractFactory("SimpleOPRU")
+  const myru = await MyRU.deploy(
+    verifierRU.address,
+    verifierDB.address,
+    committer.address,
+  )
+  const MyMRU = await ethers.getContractFactory("MultiOPRU")
+  const mymru = await MyMRU.deploy(
+    verifierRU.address,
+    verifierDB.address,
+    committer.address,
+  )
+  return { mymru, myru, committer, committer2 }
+}
 const winston = "000000000000"
 const gewi = "000000000000000000"
 const w = n => Number(n).toString() + winston
 const g = n => Number(n).toString() + gewi
-const { AO, ArMem, acc, modules } = require("wao/test")
 
-describe("WeaveDB on AO", function () {
+describe("WeaveDB AO with zkJSON", function () {
   this.timeout(0)
-  let admin,
+  let myru,
+    committer,
+    committer2,
+    ru,
+    mymru,
+    admin,
     network,
     bundler,
     test,
@@ -23,27 +61,35 @@ describe("WeaveDB on AO", function () {
     arweave,
     opt,
     ao2,
-    node,
-    token,
+    mem,
     ar,
     src,
+    validator_1,
+    validator_2,
+    _db,
+    token,
     admin_contract,
+    node,
+    _eth,
+    eth,
     _stake,
     stake,
-    eth,
-    _eth,
-    _db,
-    mem,
-    validator_1,
-    validator_2
+    addr,
+    jwk
 
   before(async () => {
+    const dep = await loadFixture(deploy)
+    myru = dep.myru
+    mymru = dep.mymru
+    committer = dep.committer
+    committer2 = dep.committer2
+
     ao2 = await new AO().init(acc[0].jwk)
     mem = ao2.mem
     ar = ao2.ar
     src = new Src({
       ar,
-      dir: resolve(__dirname, "../../../lua/contracts"),
+      dir: resolve(__dirname, "../../lua/contracts"),
     })
     ;({ pid: _db, p: token } = await ao2.deploy({
       src_data: await src.data("tDB"),
@@ -70,15 +116,15 @@ describe("WeaveDB on AO", function () {
       staking: _stake,
       admin_contract,
       bundler: ao2.ar.jwk,
+      committers: [committer2],
       aos: { mem, module: mem.modules.aos2_0_1 },
+      zk_contract: mymru.address,
+      evm_network: "sepolia",
     }
     test = new Test(opt)
     ;({ network, arweave, bundler, admin, base } = await test.start())
-  })
-
-  after(async () => await test.stop())
-  it("should deploy weavedb on AO", async () => {
-    const { addr, jwk } = await ar.gen()
+    console.log(admin)
+    ;({ addr, jwk } = await ar.gen())
     await token.m("Mint", { Quantity: w(10000) })
     await eth.m("Mint", { Quantity: g(10000) })
     await eth.m("Transfer", { Recipient: validator_1.addr, Quantity: g(10) })
@@ -103,15 +149,17 @@ describe("WeaveDB on AO", function () {
     //await wait(3000)
     expect((await node.d("Balances"))[addr]).to.eql("200" + winston)
     expect(await node.d("Info", "Name")).to.eql("Testnet WDB")
+  })
+  after(async () => await test.stop())
+
+  beforeEach(async () => {})
+  it.only("should verify rollup transactions", async function () {
     const db = new DB({
       rpc: "localhost:9090",
       contractTxId: "testdb",
       arweave: network,
     })
     //await wait(2000)
-    const stats = await db.node({ op: "stats" })
-    expect(stats).to.eql({ dbs: [], bundler: ao2.ar.addr })
-
     // add a DB to node
     const tx = await db.admin(
       {
@@ -133,13 +181,13 @@ describe("WeaveDB on AO", function () {
       { ar2: jwk },
     )
     expect((await db.node({ op: "stats" })).dbs[0].data.rollup).to.eql(true)
+
+    //await wait(2000)
     await token.m("Transfer", {
       Recipient: _stake,
       Quantity: w(1000),
       "X-DB": contractTxId,
     })
-    //await wait(5000)
-    expect((await node.d("Balances"))[addr]).to.eql("100" + winston)
     await token.m(
       "Transfer",
       {
@@ -187,7 +235,6 @@ describe("WeaveDB on AO", function () {
     // update the DB (via node)
     const db2 = new DB({ rpc: "localhost:9090", contractTxId })
     const Bob = { name: "Bob" }
-
     const tx2 = await db2.set(Bob, "ppl", "Bob", {
       privateKey: admin.privateKey,
     })
@@ -213,26 +260,32 @@ describe("WeaveDB on AO", function () {
     ).to.eql(Alice)
 
     // check zkp
-    let hash = null
-    let zkp = null
-    try {
-      hash = (await db.node({ op: "hash", key: "testdb" })).hash
-    } catch (e) {
-      console.log(e)
-    }
-    try {
-      zkp = (
-        await db.node({
-          op: "zkp",
-          key: "testdb",
-          collection: "ppl",
-          doc: "Bob",
-          path: "name",
-        })
-      ).zkp
-    } catch (e) {
-      console.log(e)
-    }
-    expect(hash).to.eql(zkp[21])
+
+    await db.admin(
+      {
+        op: "add_committer",
+        pid: contractTxId,
+      },
+      { privateKey: committer2.privateKey },
+    )
+
+    await wait(10000)
+    const { col_id, zkp } = await db.node({
+      op: "zkp",
+      key: "testdb",
+      collection: "ppl",
+      doc: "Bob",
+      path: "name",
+    })
+    console.log(zkp[21])
+    // query from Solidity
+    expect(
+      await mymru.qString(
+        contractTxId,
+        [col_id, toIndex("Bob"), ...path("name")],
+        zkp,
+      ),
+    ).to.eql("Bob")
+    return
   })
 })
