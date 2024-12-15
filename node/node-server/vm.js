@@ -7,6 +7,7 @@ const { readFileSync } = require("fs")
 const { resolve } = require("path")
 const RNode = require("./rollup")
 const VNode = require("./validator")
+const CNode = require("./committer")
 let AO = null
 const {
   all,
@@ -26,6 +27,25 @@ const { fork } = require("child_process")
 
 const { Connect, Connected } = require("./connection")
 
+class Committer {
+  constructor(params) {
+    this.cb = {}
+    const cnode = new CNode()
+    const c = params.aos.mem
+      ? new Connected({ funcs: cnode.funcs })
+      : fork(path.resolve(__dirname, "committer"))
+    this.db = new Connect({
+      c,
+      setParent: true,
+      op: "new",
+      params,
+    })
+  }
+  kill() {
+    this.db.kill()
+  }
+}
+
 class Validator {
   constructor(params) {
     this.cb = {}
@@ -39,9 +59,6 @@ class Validator {
       op: "new",
       params,
     })
-  }
-  init(afterInit) {
-    this.db.to({ op: "init", cb: afterInit })
   }
   kill() {
     this.db.kill()
@@ -223,7 +240,10 @@ class VM {
       // we dont' need to set rules every time we start it out
       const tx = await this.admin_db.setRules(rules, "dbs", auth)
       const tx2 = await this.admin_db.setRules(rules, "validators", auth)
-      console.log(`__admin__ rules added: ${tx.success}: ${tx2.success}`)
+      const tx3 = await this.admin_db.setRules(rules, "committers", auth)
+      console.log(
+        `__admin__ rules added: ${tx.success}: ${tx2.success}: ${tx3.success}`,
+      )
       const rollups = this.conf.rollups || { offchain: {} }
       const dbs = indexBy(prop("id"), await this.admin_db.cget("dbs"))
       for (let k in rollups) {
@@ -297,10 +317,43 @@ class VM {
         } = JSON.parse(query).query
         const auth = { privateKey: this.conf.admin }
         let err, signer
+        const ao2 = new AO(this.conf.aos)
         switch (op) {
+          case "add_committer":
+            ;({ err, signer } = await validate(JSON.parse(query), txid))
+            let committer = null
+            let committer_addr = null
+            for (let v of this.conf.committers ?? []) {
+              if (v.address.toLowerCase() === signer) {
+                committer = v
+                committer_addr = signer
+              }
+            }
+            const val2 = await this.admin_db.get("committers", signer)
+            if (val2?.dbs?.[txid]) callback("already exists")
+            else {
+              const _val = new Committer({
+                alchemiy_key: this.conf.alchemy_key,
+                evm_network: this.conf.evm_network,
+                contract: this.conf.zk_contract,
+                staking: this.conf.staking,
+                aos: this.conf.aos,
+                pid,
+                committer,
+              })
+              await this.admin_db.upsert(
+                { addr: signer, dbs: this.admin_db.union([txid]) },
+                "committers",
+                signer,
+                auth,
+              )
+              callback(null, {
+                result: JSON.stringify({ committer: committer_addr }),
+              })
+            }
+            break
           case "add_validator":
             ;({ err, signer } = await validate(JSON.parse(query), txid))
-            const ao2 = new AO(this.conf.aos)
             let validator = null
             let validator_addr = null
             for (let v of this.conf.validators ?? []) {
@@ -310,9 +363,8 @@ class VM {
               }
             }
             const val = await this.admin_db.get("validators", signer)
-            if (val?.dbs?.[txid]) callback("already exists")
+            if (val?.dbs?.[pid]) callback("already exists")
             else {
-              console.log("lets go:", txid)
               const _val = new Validator({
                 staking: this.conf.staking,
                 aos: this.conf.aos,
@@ -321,12 +373,11 @@ class VM {
                 jwk: validator,
               })
               await this.admin_db.upsert(
-                { addr: signer, dbs: this.admin_db.union([txid]) },
+                { addr: signer, dbs: this.admin_db.union([pid]) },
                 "validators",
                 signer,
                 auth,
               )
-              console.log(await this.admin_db.get("validators", signer))
               callback(null, {
                 result: JSON.stringify({ validator: validator_addr }),
               })

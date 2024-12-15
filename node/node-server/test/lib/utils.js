@@ -25,14 +25,22 @@ class Test {
     dbname,
     bundler,
     validators,
+    committers,
     staking,
     admin,
     admin_l1,
-    network,
+    evm_network,
     cosmwasm = false,
     admin_contract,
     mem,
+    network,
+    alchemy_key,
+    zk_contract,
   }) {
+    this.zk_contract = zk_contract
+    this.alchemy_key = alchemy_key
+    this.evm_network = evm_network
+    this.committers = committers
     this.aos = aos
     this.admin_contract = admin_contract
     this.snapshot = snapshot
@@ -55,7 +63,7 @@ class Test {
     this.dbname = dbname ?? `test-${Math.floor(Math.random() * 1000)}`
   }
   async addFunds(wallet, amount = "1000000000000000") {
-    if (!this.aos.mem) {
+    if (!this.aos?.mem) {
       const addr = await this.arweave.wallets.getAddress(wallet)
       await this.arweave.api.get(`/mint/${addr}/${amount}`)
     }
@@ -84,6 +92,9 @@ class Test {
   }
   async startVM() {
     this.conf = {
+      zk_contract: this.zk_contract,
+      evm_network: this.evm_network,
+      alchemy_key: this.alchemy_key,
       aos: this.aos,
       ao: this.base,
       admin_contract: this.admin_contract,
@@ -99,6 +110,7 @@ class Test {
       admin_l1: this.admin_l1.privateKey,
       bundler: this.bundler,
       validators: this.validators,
+      committers: this.committers,
       staking: this.staking,
       rollups: {},
       contracts: this.contracts,
