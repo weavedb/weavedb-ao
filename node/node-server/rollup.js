@@ -273,12 +273,14 @@ class Rollup {
                   hash,
                   zkdb: _zkp,
                 }
+                console.log("rolling up............................")
                 const { err, mid, res } = await this.syncer.msg({
                   pid: this.contractTxId,
                   act: "Rollup",
                   data,
                   check: "committed!",
                 })
+                console.log(res.Messages[0])
                 if (!err) {
                   results.push({
                     hash,
@@ -636,13 +638,13 @@ class Rollup {
         const { validate, locate, raw } = connect(opt)
         let { url, address } = await locate(this.contractTxId)
         if (url === "http://su") url = "http://localhost:4003"
-        res = await fetch(`${url}/${this.contractTxId}`).then(r => r.json())
+        res = fetch(`${url}/${this.contractTxId}`).then(r => r.json())
       }
       if (res.error) {
         console.log(res.error)
       } else {
         let items = 0
-        for (let v of res.edges) {
+        for (let v of res?.edges ?? []) {
           const v2 = v.node
           try {
             const json = JSON.parse(v2.message.data)
@@ -995,7 +997,7 @@ class RNode {
         this.rollup.srcTxId = msg.srcTxId
         await this.rollup.initWarp()
         this.rollup.bundle()
-        this.send({ op, id })
+        send({ op, id })
       },
       hash: async ({ msg, send, op, id }) => {
         send({ op, id, result: { hash: this.rollup.hash } })

@@ -10,7 +10,7 @@ const {
   to,
   wallet = "bundler",
   network = "mainnet",
-  quantity = "1000",
+  quantity = "100000000",
   decimal = 12,
 } = yargs(process.argv.slice(2)).argv
 
@@ -43,6 +43,7 @@ const main = async () => {
     act: "Transfer",
     tags: { Recipient: to, Quantity: `${quantity}${zero}` },
   })
+  console.log(res)
   console.log(
     (
       await ao.dry({

@@ -30,6 +30,7 @@ const {
   Wallet,
   getDefaultProvider,
   Contract,
+  JsonRpcProvider,
 } = require("ethers")
 
 const { tags } = require("wao/utils")
@@ -425,6 +426,7 @@ class Committer {
     this.staking = staking
     this.contract = contract
     this.hash = null
+    this.committing = false
     if (aos?.mem) {
       const { AO: TAO } = require("wao/test")
       AO = TAO
@@ -438,11 +440,13 @@ class Committer {
   async commit() {
     let ao = new AO(this.aos)
     let p = ao.p(this.staking)
+    if (this.committing) return
+    this.committing = true
     try {
       const db = await p.d("Get-DB", { DB: this.pid })
       const block = db.blocks[db.height]
       if (block?.txid) {
-        const _hash = JSON.parse(await ao.ar.data(block.txid)).zkdb
+        const _hash = JSON.parse(await ao.ar.data(block.txid, true)).zkdb
         if (_hash && _hash !== this.hash) {
           let contract = null
           if (!this.alchemy_key) {
@@ -452,9 +456,8 @@ class Committer {
             )
             contract = new ethers.Contract(this.contract, abi, wallet)
           } else {
-            const provider = getDefaultProvider(
-              this.evm_network,
-              this.alchemy_key,
+            const provider = new JsonRpcProvider(
+              `https://eth-${this.evm_network}.g.alchemy.com/v2/${this.alchemy_key}`,
             )
             const wallet = new Wallet(this.committer.privateKey, provider)
             contract = new Contract(this.contract, abi, wallet)
@@ -470,6 +473,7 @@ class Committer {
     } catch (e) {
       console.log(e)
     }
+    this.committing = false
   }
   async start() {
     setInterval(() => this.commit(), 10000)
