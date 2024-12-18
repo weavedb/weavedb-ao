@@ -1,6 +1,6 @@
-import { AR, AO } from "aonote"
-import { wait } from "aonote/test/utils.js"
-import { Src } from "aonote/test/helpers.js"
+import { AR, AO } from "wao"
+import { wait } from "wao/utils"
+import { Src } from "wao/test"
 import { dirname, resolve } from "path"
 import dotenv from "dotenv"
 dotenv.config()
@@ -9,7 +9,7 @@ import { readFileSync } from "fs"
 import { fileURLToPath } from "node:url"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-export default async ({ wallet, network }) => {
+export default async ({ wallet, network, module, scheduler }) => {
   const jwk = JSON.parse(
     readFileSync(resolve(__dirname, ".wallets", `${wallet}.json`), "utf8"),
   )
@@ -19,8 +19,8 @@ export default async ({ wallet, network }) => {
   if (network === "localhost") {
     opt2 = {
       ar,
-      module: process.env.MODULE,
-      scheduler: process.env.SCHEDULER,
+      module: module ?? process.env.MODULE,
+      scheduler: scheduler ?? process.env.SCHEDULER,
       authority: process.env.AUTHORITY,
       aoconnect: {
         MU_URL: "http://localhost:4002",
@@ -31,5 +31,9 @@ export default async ({ wallet, network }) => {
   }
   const ao = new AO(opt2)
   const src = new Src({ ar, dir: resolve(__dirname, "../../lua/contracts") })
-  return { ao, src }
+  const tdb = process.env.TDB
+  const eth = process.env.ETH
+  const staking = process.env.STAKING
+  const node = process.env.NODE
+  return { jwk, ao, src, authority: opt2.authority, tdb, eth, staking, node }
 }

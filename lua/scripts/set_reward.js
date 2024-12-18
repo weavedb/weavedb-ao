@@ -1,16 +1,14 @@
 import yargs from "yargs"
 import setup from "./setup.js"
 const {
-  staking = "staking",
-  tdb = "tdb",
   wallet = "owner",
-  network = "mainnet",
+  network = "localhost",
   amount = "100000000",
   duration = 1000 * 60 * 60 * 24 * 365,
 } = yargs(process.argv.slice(2)).argv
 
 const main = async () => {
-  const { ao, src } = await setup({ wallet, network })
+  const { ao, src, staking, tdb } = await setup({ wallet, network })
   const db = ao.p(tdb)
   const { mid } = await db.msg(
     "Transfer",

@@ -310,7 +310,6 @@ export default function Home({ _date = null }) {
   ]
   useEffect(() => {
     ;(async () => {
-      const ao = new AO()
       const p = new AO(opt).p(process.env.NEXT_PUBLIC_STAKING)
       setStakeStats(await p.d("Info"))
       setAllDBs(await p.d("Get-DBs"))
@@ -478,7 +477,7 @@ export default function Home({ _date = null }) {
         },
       ]
   const dbmap = indexBy(prop("id"))(dbs ?? [])
-  const pool = (stakeStats?.Rewards.pool ?? 0) * 1
+  const pool = (stakeStats?.Rewards?.pool ?? 0) * 1
   const day = pool / 10 ** 12 / 365
   const mystake = (myStats?.stake ?? 0) * 1
   const allstake = (stakeStats?.TotalStake ?? 0) * 1
@@ -770,7 +769,6 @@ export default function Home({ _date = null }) {
                   const v = _v.info
                   const node = nodes[v.node]
                   let mystake = 0
-                  console.log(_v)
                   if (!is(Array, v.stakes)) {
                     for (let k in v.stakes) {
                       if (k === addr) mystake += v.stakes[k] * 1
@@ -783,7 +781,6 @@ export default function Home({ _date = null }) {
                       }
                     }
                   }
-                  console.log(v)
                   return (
                     <Flex
                       sx={{
@@ -1548,7 +1545,7 @@ export default function Home({ _date = null }) {
                           <Box mb={1}>Select Node</Box>
                           <Select
                             value={node?.id}
-                            onChange={e => setNode(nodes[e.target.value])}
+                            onChange={e => setNode(nodes[e.target.value - 1])}
                           >
                             {map(v => (
                               <option value={v.id}>{v.info.url}</option>
@@ -2073,6 +2070,7 @@ export default function Home({ _date = null }) {
                                     )
                                     setStakeStats(await p.d("Info"))
                                     setAllDBs(await p.d("Get-DBs"))
+                                    if (dbname2 === "") setDBName2(dbname)
                                   } catch (e) {
                                     toast({
                                       title: "Something Went Wrong!",
@@ -2092,7 +2090,7 @@ export default function Home({ _date = null }) {
                                   className="fas fa-spin fa-circle-notch"
                                 />
                               ) : (
-                                "Deploy"
+                                "Create"
                               )}
                             </Flex>
                           </Box>
@@ -2305,7 +2303,7 @@ export default function Home({ _date = null }) {
                                         { get: "Balance" },
                                       )
                                       setBalanceETH({ amount: out * 1, addr })
-                                      const p2 = getP(
+                                      const { p: p2 } = await getP(
                                         process.env.NEXT_PUBLIC_STAKING,
                                         jwk,
                                       )
@@ -2695,6 +2693,7 @@ export default function Home({ _date = null }) {
                                             ar2: jwk ?? arweaveWallet,
                                           },
                                         )
+                                        console.log(tx2)
                                         if (!tx2.success) {
                                           err = "error"
                                         } else {
@@ -2737,6 +2736,7 @@ export default function Home({ _date = null }) {
                                           }
                                         }
                                       } catch (e) {
+                                        console.log(e)
                                         err = "error"
                                       }
                                       if (err) {
@@ -3027,6 +3027,7 @@ export default function Home({ _date = null }) {
                                       })
                                       setProfiles(await db.get(selectedCol))
                                       let updated = true
+                                      /*
                                       setTimeout(async () => {
                                         do {
                                           updated = await commit({
@@ -3038,7 +3039,7 @@ export default function Home({ _date = null }) {
                                             _alert: false,
                                           })
                                         } while (updated)
-                                      }, 5000)
+                                      }, 5000)*/
                                       toast({
                                         title: "Doc Added!",
                                         status: "success",
@@ -3347,23 +3348,23 @@ export default function Home({ _date = null }) {
                             >
                               Query Rollup
                             </Flex>
-                            {search === "multi" ? null : (
-                              <Flex
-                                h="40px"
-                                align="center"
-                                ml={4}
-                                flex={1}
-                                justify="center"
-                                bg={query_ok ? "#5137C5" : "#999"}
-                                color="white"
-                                py={1}
-                                px={3}
-                                sx={{
-                                  borderRadius: "5px",
-                                  ":hover": { opacity: 0.75 },
-                                  cursor: query_ok ? "pointer" : "default",
-                                }}
-                                onClick={async () => {
+                            <Flex
+                              h="40px"
+                              align="center"
+                              ml={4}
+                              flex={1}
+                              justify="center"
+                              bg={query_ok ? "#5137C5" : "#999"}
+                              color="white"
+                              py={1}
+                              px={3}
+                              sx={{
+                                borderRadius: "5px",
+                                ":hover": { opacity: 0.75 },
+                                cursor: query_ok ? "pointer" : "default",
+                              }}
+                              onClick={async () => {
+                                if (query_ok) {
                                   setLoading(true)
                                   setData(null)
                                   const contractTxId = indexBy(prop("id"), dbs)[
@@ -3371,34 +3372,40 @@ export default function Home({ _date = null }) {
                                   ].data.contractTxId
                                   const ao = new AO(opt)
                                   const start = Date.now()
-                                  const b = JSON.parse(
-                                    (
-                                      await ao.dry({
-                                        pid: contractTxId,
-                                        act: "Get",
-                                        tags: {
-                                          Query: JSON.stringify([
-                                            selectedCol,
-                                            query,
-                                          ]),
-                                        },
-                                        get: { name: "Result", json: true },
-                                      })
-                                    ).out,
-                                  )
+                                  const q = getQ({
+                                    order,
+                                    query,
+                                    search,
+                                    selectedCol,
+                                    limit,
+                                    operator,
+                                    value,
+                                    sort,
+                                  })
+                                  const b = (
+                                    await ao.dry({
+                                      pid: contractTxId,
+                                      act: "Get",
+                                      tags: {
+                                        Query: JSON.stringify(q),
+                                      },
+                                      get: true,
+                                    })
+                                  ).out
+
                                   setLatency2({
                                     txid: contractTxId,
                                     duration: Date.now() - start,
                                   })
                                   setWhich("AO Process")
                                   setData(b)
-                                  setSelectedData(b)
+                                  if (search === "single") setSelectedData(b)
                                   setLoading(false)
-                                }}
-                              >
-                                Query AO
-                              </Flex>
-                            )}
+                                }
+                              }}
+                            >
+                              Query AO
+                            </Flex>
                           </Flex>
                           <Box mt={4} w="100%" fontSize="14px">
                             {loading ? (

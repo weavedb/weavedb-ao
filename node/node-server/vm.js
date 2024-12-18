@@ -36,7 +36,7 @@ class Committer {
       : fork(path.resolve(__dirname, "committer"))
     this.db = new Connect({
       c,
-      setParent: true,
+      setParent: params.aos.mem ? true : false,
       op: "new",
       params,
     })
@@ -55,7 +55,7 @@ class Validator {
       : fork(path.resolve(__dirname, "validator"))
     this.db = new Connect({
       c,
-      setParent: true,
+      setParent: params.aos.mem ? true : false,
       op: "new",
       params,
     })
@@ -94,9 +94,10 @@ class Rollup {
     const c = aos.mem
       ? new Connected({ funcs: rnode.funcs })
       : fork(path.resolve(__dirname, "rollup"))
+
     this.db = new Connect({
       c,
-      setParent: true,
+      setParent: aos.mem ? true : false,
       op: "new",
       params: {
         aos,
@@ -333,7 +334,7 @@ class VM {
             if (val2?.dbs?.[txid]) callback("already exists")
             else {
               const _val = new Committer({
-                alchemiy_key: this.conf.alchemy_key,
+                alchemy_key: this.conf.alchemy_key,
                 evm_network: this.conf.evm_network,
                 contract: this.conf.zk_contract,
                 staking: this.conf.staking,

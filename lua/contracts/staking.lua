@@ -313,7 +313,7 @@ Handlers.add(
 	    TotalStake = TotalStake,
 	    TotalDeposit = TotalDeposit,
 	    TotalReward = TotalReward,
-	    Rewards = rewards
+	    Rewards = rewards or nil
 	})
     })
   end

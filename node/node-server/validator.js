@@ -50,6 +50,7 @@ class Validator {
     let p = ao.p(this.staking)
     try {
       const db = await p.d("Get-DB", { DB: this.pid })
+      if (!db) return
       const block = db.blocks[db.height + 1]
       if (block && !block.finalized && !block.validators?.[this.addr]) {
         console.log("validating...:", db.height + 1)
