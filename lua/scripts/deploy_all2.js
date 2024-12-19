@@ -114,7 +114,10 @@ const main = async () => {
     },
     { check: /transferred/, jwk: wallets.validator2 },
   )
-  const db2 = new DB({ rpc: "localhost:8080", contractTxId })
+  const db2 = new DB({
+    rpc: network === "localhost" ? "localhost:8080" : "test.wdb.ae:433",
+    contractTxId,
+  })
   await db2.admin(
     {
       op: "add_validator",
@@ -136,6 +139,18 @@ const main = async () => {
       pid: contractTxId,
     },
     { privateKey: wallets.committer.privateKey },
+  )
+
+  await eth.m(
+    "Transfer",
+    {
+      Recipient: staking,
+      Quantity: g(1),
+      "X-Action": "Delegate",
+      "X-DB": contractTxId,
+      "X-Delegate-To": await ao.ar.toAddr(wallets.validator1),
+    },
+    { check: /transferred/, jwk: wallets.delegator },
   )
 }
 main()
