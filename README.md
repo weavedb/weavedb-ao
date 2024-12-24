@@ -29,7 +29,7 @@ Clone the repo and install dependencies.
 
 ```bash
 git clone https://github.com/weavedb/weavedb-ao.git
-cd weavedbb-ao/lua && yarn
+cd weavedb-ao/lua && yarn
 mkdir scripts/.wallets
 ```
 Under `scripts/.wallets`, prepare the following wallets.
@@ -65,10 +65,18 @@ node scripts/deploy_all.js
 
 ### WeaveDB Rollup
 
+In another terminal, run envoy so frontend apps can access via port 8080.
+
+```bash
+cd weavedb-ao
+yarn envoy
+```
+
 Now start the rollup node in another terminal.
 
 ```bash
-cd weavedbb-ao/node/node-server && node index.js
+cd weavedbb-ao/node/node-server && yarn
+node index.js
 ```
 
 ### WeaveLayer Staking on AO
@@ -81,14 +89,7 @@ node scripts/setup_staking.js
 
 ### Frontend Demo
 
-In another terminal, run envoy so frontend apps can access via port 8080.
-
-```bash
-cd weavedb-ao
-yarn envoy
-```
-
-Yet in anotehr terminal, run the demo app.
+In anotehr terminal, run the demo app.
 
 ```bash
 cd weavedb-ao/demo && yarn

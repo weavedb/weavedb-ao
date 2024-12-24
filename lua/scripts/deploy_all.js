@@ -1,4 +1,5 @@
 import yargs from "yargs"
+import { concat } from "ramda"
 import setup from "./setup.js"
 import { Src } from "wao/test"
 import { wait, srcs } from "wao/utils"
@@ -20,7 +21,7 @@ const {
 } = yargs(process.argv.slice(2)).argv
 const w = n => Number(n).toString() + "000000000000"
 const g = n => Number(n).toString() + "000000000000000000"
-
+const zkjson = "0x2F79B95E165011b1A02803B5B7A7a18A4978a3b9"
 let wallets = {
   owner,
   bundler,
@@ -107,6 +108,7 @@ const set_reward = async ({
 
 const main = async () => {
   const { ao, src, alchemy } = await setup({ wallet: owner, network })
+  env.push(`ALCHEMY=${alchemy}`)
   let authority, module_aos2, scheduler
   if (network === "mainnet") {
     ;({ scheduler, module_aos2, authority } = srcs)
@@ -154,17 +156,35 @@ const main = async () => {
 
   await set_reward({ ao, tdb, staking })
 
-  let pubs = readFileSync(
-    resolve(import.meta.dirname, "../../demo/.env.local"),
-    "utf8",
-  ).split("\n")
-
+  let pubs = []
   try {
     pubs = readFileSync(
       resolve(import.meta.dirname, `../../demo/.env.${network}.local`),
       "utf8",
     ).split("\n")
-  } catch (e) {}
+  } catch (e) {
+    const mainnet = [
+      `NEXT_PUBLIC_CONTRACT="${zkjson}"`,
+      `NEXT_PUBLIC_SCAN="https://scan.weavedb.dev"`,
+      `NEXT_PUBLIC_NODE="ao-test"`,
+      `NEXT_PUBLIC_RPC="https://test.wdb.ae"`,
+      `NEXT_PUBLIC_RPC_NODE="test.wdb.ae:443"`,
+    ]
+    const testnet = [
+      `NEXT_PUBLIC_CONTRACT="${zkjson}"`,
+      `NEXT_PUBLIC_SCAN="https://scan.weavedb.dev"`,
+      `NEXT_PUBLIC_NODE="localhost"`,
+      `NEXT_PUBLIC_RPC="http://localhost:8080"`,
+      `NEXT_PUBLIC_RPC_NODE="localhost:8080"`,
+    ]
+
+    pubs = concat(network === "localhost" ? testnet : mainnet, [
+      `NEXT_PUBLIC_TDB=${tdb}`,
+      `NEXT_PUBLIC_ETH=${eth}`,
+      `NEXT_PUBLIC_ADMIN_CONTRACT=${node}`,
+      `NEXT_PUBLIC_STAKING=${staking}`,
+    ])
+  }
 
   let i = 0
   for (let v of pubs) {
@@ -198,7 +218,7 @@ const main = async () => {
   config.admin ??= wallets.admin.privateKey
   config.admin_contract = node
   config.staking = staking
-  config.zk_contract ??= "0x2F79B95E165011b1A02803B5B7A7a18A4978a3b9"
+  config.zk_contract ??= zkjson
   config.evm_network ??= "sepolia"
   config.alchemy_key ??= alchemy
   config.aos ??= {}
