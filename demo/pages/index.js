@@ -9,7 +9,10 @@ const { toIndex, path, encodeQuery } = require("zkjson")
 import { useEffect, useState } from "react"
 import DB from "weavedb-client"
 import { opt, abi } from "@/lib/utils"
-const network = { host: "localhost", port: 4000, protocol: "http" }
+const network =
+  process.env.NEXT_PUBLIC_NODE === "localhost"
+    ? { host: "localhost", port: 4000, protocol: "http" }
+    : { host: "arweave.net", port: 443, protocol: "https" }
 const { Contract, getDefaultProvider } = require("ethers")
 import About from "@/components/About"
 import Footer from "@/components/Footer"
@@ -339,6 +342,7 @@ export default function Home({ _date = null }) {
           const _dbs = filter(
             v => !isNil(v.data.admin) && !isNil(v.data.contractTxId),
           )(stats.dbs)
+          console.log(_dbs)
           setDBs(_dbs)
           if (_dbs[0]) {
             setDBName2(_dbs[0].id ?? null)
@@ -358,7 +362,6 @@ export default function Home({ _date = null }) {
       }
     })()
   }, [node])
-
   useInterval(async () => {
     if (addr) {
       const ao = new AO(opt)

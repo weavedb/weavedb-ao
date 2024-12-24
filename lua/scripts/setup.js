@@ -29,5 +29,16 @@ export default async ({ authority, wallet, network, module, scheduler }) => {
   const eth = process.env.ETH
   const staking = process.env.STAKING
   const node = process.env.NODE
-  return { jwk, ao, src, authority: opt.authority, tdb, eth, staking, node }
+  const alchemy = process.env.ALCHEMY
+  return {
+    jwk,
+    ao,
+    src,
+    authority: opt.authority,
+    tdb,
+    eth,
+    staking,
+    node,
+    alchemy,
+  }
 }

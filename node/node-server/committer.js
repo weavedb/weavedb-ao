@@ -32,7 +32,6 @@ const {
   Contract,
   JsonRpcProvider,
 } = require("ethers")
-
 const { tags } = require("wao/utils")
 let arweave = require("arweave")
 let AO = null
