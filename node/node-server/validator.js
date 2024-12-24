@@ -61,11 +61,11 @@ class Validator {
         )
       }
     } catch (e) {
-      console.log(e)
+      console.log("fetch failed...")
     }
   }
   async start() {
-    setInterval(() => this.validate(), 3000)
+    setInterval(() => this.validate(), 10000)
   }
 }
 class VNode {
