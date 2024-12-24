@@ -36,7 +36,7 @@
     "react-qr-code": "^2.0.15",
     "react-syntax-highlighter": "^15.6.1",
     "usehooks-ts": "^3.1.0",
-    "wao": "^0.1.6",
+    "wao": "^0.7.0",
     "weavedb-client": "^0.45.2",
     "weavedb-node-client": "^0.45.2",
     "zkjson": "^0.3.2"
