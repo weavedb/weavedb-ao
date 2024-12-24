@@ -726,7 +726,6 @@ export default function Home({ _date = null }) {
                     h="32px"
                     align="center"
                     fontSize={["12px", "14px"]}
-                    color="#999"
                     justify="center"
                     bg={withdrawable > 0 ? "#5137C5" : "#999"}
                     color="white"
