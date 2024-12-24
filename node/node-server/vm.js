@@ -175,7 +175,6 @@ class Rollup {
 
 class VM {
   constructor({ dbname, conf }) {
-    console.log("yes man.......", conf)
     if (conf.aos?.mem) {
       const { AO: TAO } = require("wao/test")
       AO = TAO
