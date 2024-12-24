@@ -3,9 +3,8 @@ import setup from "./setup.js"
 import { Src } from "wao/test"
 import { wait, srcs } from "wao/utils"
 import { dirname, resolve } from "path"
-import { mkdirSync, writeFileSync, readFileSync } from "fs"
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs"
 import { fileURLToPath } from "node:url"
-import config from "../../node/node-server/weavedb.config.js"
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const {
@@ -14,13 +13,24 @@ const {
   validator1 = "validator1",
   validator2 = "validator2",
   delegator = "delegator",
+  committer = "committer",
   db = "db",
   network = "localhost",
+  admin = "admin",
 } = yargs(process.argv.slice(2)).argv
 const w = n => Number(n).toString() + "000000000000"
 const g = n => Number(n).toString() + "000000000000000000"
 
-let wallets = { owner, bundler, validator1, validator2, db, delegator }
+let wallets = {
+  owner,
+  bundler,
+  validator1,
+  validator2,
+  db,
+  delegator,
+  committer,
+  admin,
+}
 for (let k in wallets) {
   wallets[k] = JSON.parse(
     readFileSync(resolve(__dirname, ".wallets", `${k}.json`), "utf8"),
@@ -96,7 +106,7 @@ const set_reward = async ({
 }
 
 const main = async () => {
-  const { ao, src } = await setup({ wallet: owner, network })
+  const { ao, src, alchemy } = await setup({ wallet: owner, network })
   let authority, module_aos2, scheduler
   if (network === "mainnet") {
     ;({ scheduler, module_aos2, authority } = srcs)
@@ -105,7 +115,6 @@ const main = async () => {
     const src2 = new Src({ ar: ao.ar })
     await wait(100)
     const wasm_aos2 = await src2.upload("aos2_0_1", "wasm")
-
     ;({ id: module_aos2 } = await ao.postModule({
       data: await ao.ar.data(wasm_aos2),
     }))
@@ -129,13 +138,9 @@ const main = async () => {
     authority,
   })
   const tdb = await deploy_token({ ao: ao2, src, token: "tDB" })
-  console.log(`NEXT_PUBLIC_TDB=${tdb}`)
   const eth = await deploy_token({ ao: ao2, src, token: "taoETH" })
-  console.log(`NEXT_PUBLIC_ETH=${eth}`)
   const staking = await deploy_staking({ ao: ao2, src, tdb, eth })
-  console.log(`NEXT_PUBLIC_ADMIN_CONTRACT=${node}`)
   const node = await deploy_node({ ao: ao2, src, tdb })
-  console.log(`NEXT_PUBLIC_STAKING=${staking}`)
 
   env.push(`TDB=${tdb}`)
   env.push(`ETH=${eth}`)
@@ -184,61 +189,82 @@ const main = async () => {
     import.meta.dirname,
     "../../node/node-server/.configs/",
   )
-  try {
-    mkdirSync(config_dir)
-  } catch (e) {}
+  if (!existsSync(config_dir)) mkdirSync(config_dir)
   const config_json = resolve(config_dir, `${network}.json`)
+  let config = {}
   try {
     config = JSON.parse(readFileSync(config_json, "utf8"))
   } catch (e) {}
-
+  config.admin ??= wallets.admin.privateKey
   config.admin_contract = node
   config.staking = staking
+  config.zk_contract ??= "0x2F79B95E165011b1A02803B5B7A7a18A4978a3b9"
+  config.evm_network ??= "sepolia"
+  config.alchemy_key ??= alchemy
+  config.aos ??= {}
   config.aos.module = module_aos2
   config.aos.scheduler = scheduler
+  config.bundler ??= wallets.bundler
+  config.validators ??= [wallets.validator1, wallets.validator2]
+  config.committers ??= [wallets.committer]
+
+  if (network === "localhost") {
+    config.aos.ar = { port: 4000 }
+    config.aos.aoconnect = {
+      MU_URL: "http://localhost:4002",
+      CU_URL: "http://localhost:4004",
+      GATEWAY_URL: "http://localhost:4000",
+    }
+  } else {
+    config.aos.ar = {}
+    delete config.aos.aoconnect
+  }
+  const config_path = resolve(
+    import.meta.dirname,
+    "../../node/node-server/weavedb.config.js",
+  )
+
   writeFileSync(
-    resolve(import.meta.dirname, "../../node/node-server/weavedb.config.js"),
+    config_path,
     `module.exports = ${JSON.stringify(config, null, 2)}`,
   )
   writeFileSync(config_json, JSON.stringify(config, null, 2))
 
   const p = ao.p(tdb)
   const p2 = ao.p(eth)
-  await p.m("Transfer", {
-    Quantity: w(10000),
-    Recipient: await ao.ar.toAddr(wallets.db),
-  })
-  await p2.m("Transfer", {
-    Quantity: g(10),
-    Recipient: await ao.ar.toAddr(wallets.bundler),
-  })
+  const db_addr = await ao.ar.toAddr(wallets.db)
+  const bundler_addr = await ao.ar.toAddr(wallets.bundler)
+  const validator1_addr = await ao.ar.toAddr(wallets.validator1)
+  const validator2_addr = await ao.ar.toAddr(wallets.validator2)
+  const delegator_addr = await ao.ar.toAddr(wallets.delegator)
 
-  await p2.m("Transfer", {
-    Quantity: g(10),
-    Recipient: await ao.ar.toAddr(wallets.validator1),
-  })
-  await p2.m("Transfer", {
-    Quantity: g(10),
-    Recipient: await ao.ar.toAddr(wallets.validator2),
-  })
-  await p2.m("Transfer", {
-    Quantity: g(10),
-    Recipient: await ao.ar.toAddr(wallets.delegator),
-  })
+  await p.m("Transfer", { Quantity: w(10000), Recipient: db_addr })
+  console.log(`Transferred 10000 tDB to ${db_addr}`)
+  await p2.m("Transfer", { Quantity: g(10), Recipient: bundler_addr })
+  console.log(`Transferred 10 taoETH to ${bundler_addr}`)
+  await p2.m("Transfer", { Quantity: g(10), Recipient: validator1_addr })
+  console.log(`Transferred 10 taoETH to ${validator1_addr}`)
+  await p2.m("Transfer", { Quantity: g(10), Recipient: validator2_addr })
+  console.log(`Transferred 10 taoETH to ${validator2_addr}`)
+  await p2.m("Transfer", { Quantity: g(10), Recipient: delegator_addr })
+  console.log(`Transferred 10 taoETH to ${delegator_addr}`)
   const p_eth = ao.p(eth)
 
+  const url =
+    network === "localhost"
+      ? "http://localhost:8080"
+      : "https://test.wdb.ae:443"
   await p_eth.m(
     "Transfer",
     {
       Recipient: staking,
       Quantity: g(1),
       "X-Action": "Add-Node",
-      "X-URL":
-        network === "localhost"
-          ? "http://localhost:8080"
-          : "https://test.wdb.ae:433",
+      "X-URL": url,
     },
     { jwk: wallets.bundler, check: /transferred/ },
   )
+  console.log(`Node added: ${url}`)
 }
+
 main()

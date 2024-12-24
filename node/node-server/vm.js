@@ -190,7 +190,6 @@ class VM {
     if (isNil(this.conf.admin_contract))
       throw Error("admin_contract is not defined")
     if (isNil(this.conf.admin)) throw Error("admin is not defined")
-    if (isNil(this.conf.rollups)) throw Error("rollups are not defined")
     this.admin = new Wallet(this.conf.admin)
     console.log(`Rollup Admin: ${this.admin.address}`)
     this.rollups = {}
@@ -245,7 +244,9 @@ class VM {
       console.log(
         `__admin__ rules added: ${tx.success}: ${tx2.success}: ${tx3.success}`,
       )
-      const rollups = this.conf.rollups || { offchain: {} }
+      const rollups = this.conf.rollups || {
+        offchain: { owner: this.conf.admin },
+      }
       const dbs = indexBy(prop("id"), await this.admin_db.cget("dbs"))
       for (let k in rollups) {
         if (isNil(dbs[k])) await this.admin_db.set(rollups[k], "dbs", k, auth)

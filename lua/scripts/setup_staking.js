@@ -18,6 +18,7 @@ const {
   committer = "committer",
   db = "db",
   network = "localhost",
+  dbname = "demo",
 } = yargs(process.argv.slice(2)).argv
 const w = n => Number(n).toString() + "000000000000"
 const g = n => Number(n).toString() + "000000000000000000"
@@ -38,45 +39,49 @@ const main = async () => {
     wallet: owner,
     network,
   })
-  await wait(100)
+
+  await wait(1000)
   const token = ao.p(tdb)
   const aoeth = ao.p(eth)
   const st = ao.p(staking)
   const nd = ao.p(node)
-  console.log(await ao.ar.toAddr(wallets.node))
   await token.m(
     "Transfer",
     { Recipient: node, Quantity: w(100) },
     { jwk: wallets.db },
   )
-  await wait(2000)
+
+  console.log("deposit 100 tDB to the node!")
+  await wait(5000)
   const db = new DB({
-    rpc: "localhost:8080",
-    contractTxId: "testdb",
+    rpc: network === "localhost" ? "localhost:8080" : "test.wdb.ae:443",
+    contractTxId: dbname,
   })
-  console.log(await ao.ar.toAddr(wallets.db))
-  console.log(await st.d("Balances"))
-  console.log(await nd.d("Balances"))
-  console.log(await token.d("Balances"))
+  console.log(staking, await st.d("Balances"))
+  console.log(node, await nd.d("Balances"))
+  console.log(tdb, await token.d("Balances"))
+
   const tx = await db.admin(
     {
       op: "add_db",
-      key: "testdb",
+      key: dbname,
       db: { rollup: true, owner: await ao.ar.toAddr(wallets.db) },
     },
     { ar2: wallets.db },
   )
   if (!tx.success) return console.log("error")
 
+  console.log("db added!")
   const { contractTxId, srcTxId } = await db.admin(
     {
       op: "deploy_contract",
-      key: "testdb",
+      key: dbname,
       type: "ao",
     },
     { ar2: wallets.db },
   )
-  await wait(2000)
+  console.log("deployed:", contractTxId)
+  await wait(5000)
   await token.m(
     "Transfer",
     {
@@ -86,15 +91,7 @@ const main = async () => {
     },
     { jwk: wallets.db },
   )
-  await token.m(
-    "Transfer",
-    {
-      Recipient: staking,
-      Quantity: w(1000),
-      "X-DB": contractTxId,
-    },
-    { jwk: wallets.db },
-  )
+  console.log(`Deposit 1000 tDB token to:`, contractTxId)
 
   await aoeth.m(
     "Transfer",
@@ -105,6 +102,9 @@ const main = async () => {
     },
     { check: /transferred/, jwk: wallets.validator1 },
   )
+
+  console.log(`Stake 1 taoETH as a validator1`)
+
   await aoeth.m(
     "Transfer",
     {
@@ -114,8 +114,10 @@ const main = async () => {
     },
     { check: /transferred/, jwk: wallets.validator2 },
   )
+
+  console.log(`Stake 1 taoETH as a validator2`)
   const db2 = new DB({
-    rpc: network === "localhost" ? "localhost:8080" : "test.wdb.ae:433",
+    rpc: network === "localhost" ? "localhost:8080" : "test.wdb.ae:443",
     contractTxId,
   })
   await db2.admin(
@@ -125,6 +127,7 @@ const main = async () => {
     },
     { ar2: wallets.validator1 },
   )
+  console.log(`validator1 added!`)
   await db2.admin(
     {
       op: "add_validator",
@@ -132,7 +135,7 @@ const main = async () => {
     },
     { ar2: wallets.validator2 },
   )
-
+  console.log(`validator2 added!`)
   await db2.admin(
     {
       op: "add_committer",
@@ -140,17 +143,19 @@ const main = async () => {
     },
     { privateKey: wallets.committer.privateKey },
   )
-
-  await eth.m(
+  console.log(`zk-committer added!`)
+  const validator1_addr = await ao.ar.toAddr(wallets.validator1)
+  await aoeth.m(
     "Transfer",
     {
       Recipient: staking,
       Quantity: g(1),
       "X-Action": "Delegate",
       "X-DB": contractTxId,
-      "X-Delegate-To": await ao.ar.toAddr(wallets.validator1),
+      "X-Delegate-To": validator1_addr,
     },
     { check: /transferred/, jwk: wallets.delegator },
   )
+  console.log(`Delegated 1 taoETH to: ${validator1_addr}`)
 }
 main()
