@@ -470,12 +470,7 @@ weavedb.get = function (query)
   return result
 end
 
-weavedb.cget3 = function (query)
-  --local q = _parser(query)
-  return 3
-end
-
-weavedb.cget2 = function (query)
+weavedb.cget = function (query)
   local q = _parser(query)
   local result = nil
   if #q.path == 1 then
@@ -484,7 +479,7 @@ weavedb.cget2 = function (query)
   else
     result = { id = query[2], data = data[query[1]][query[2]], __cursor__ = true }
   end
-  return query
+  return result
 end
 
 weavedb.set = function (query)
@@ -520,7 +515,7 @@ weavedb.upsert = function (query)
 end
 
 weavedb.delete = function (query)
-  local _data, col, doc = table.unpack(query)
+  local col, doc = table.unpack(query)
   data[col] = data[col] or {}
   if data[col][doc] == nil then return false end
   data[col][doc] = nil
