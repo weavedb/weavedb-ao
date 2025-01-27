@@ -449,10 +449,10 @@ local function query_data(query, cget)
   end
   
   -- Remove injected IDs
-  for _, doc in ipairs(cursored_docs) do
+  for i, doc in ipairs(cursored_docs) do
     local id = doc.__id__
     doc.__id__ = nil
-    if cget then  doc = { id = id, data = doc } end
+    if cget then  cursored_docs[i] = { id = id, data = doc, __cursor__ = true } end
   end
   
   return cursored_docs
