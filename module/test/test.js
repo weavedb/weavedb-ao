@@ -31,8 +31,8 @@ describe("WeaveDB", function () {
     })
 
     assert.deepEqual(await p.d("Cget", { Query: JSON.stringify(["ppl"]) }), [
-      { name: "Alice" },
-      { name: "Beth", age: 4 },
+      { __cursor__: true, id: "1", data: { name: "Alice" } },
+      { __cursor__: true, id: "beth", data: { name: "Beth", age: 4 } },
     ])
   })
 })
